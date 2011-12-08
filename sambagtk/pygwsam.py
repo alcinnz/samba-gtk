@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 import sys
 import os.path
@@ -7,6 +7,7 @@ import getopt
 import gobject
 import gtk
 
+sys.path.append('/usr/local/samba/lib/python2.7/site-packages/')
 from samba import credentials
 from samba.dcerpc import (
     samr,
@@ -131,7 +132,7 @@ class SAMPipeManager(object):
 
     def update_user(self, user):
         """Submit any changes to 'user' to the server.
-        
+
         The User's RID must be correct for this to work.
         This function will call update_user_security() to update user security
         options.
@@ -300,7 +301,7 @@ class SAMPipeManager(object):
 
     def info_to_user(self, query_info, user=None):
         """Converts 'query_info' information into a user type.
-        
+
         Values in 'user' will be overwriten by this function. If called with 'None' then a new User structure will be created
 
         returns 'user
@@ -341,12 +342,13 @@ class SAMPipeManager(object):
         # we wanted
         security_descriptor = secinfo.sd
         DACL = security_descriptor.dacl
-        ace_list = DACL.aces
+        if DACL is not None :
+            ace_list = DACL.aces
 
-        # we don't really need to find the user in ace_list because the first
-        # entry (S-1-1-0) should have the same flags anyways
-        ace =  ace_list[0]
-        user.cannot_change_password = (samr.SAMR_USER_ACCESS_CHANGE_PASSWORD & ace.access_mask) == 0
+            # we don't really need to find the user in ace_list because the first
+            # entry (S-1-1-0) should have the same flags anyways
+            ace =  ace_list[0]
+            user.cannot_change_password = (samr.SAMR_USER_ACCESS_CHANGE_PASSWORD & ace.access_mask) == 0
 
         return user
 
@@ -752,7 +754,7 @@ class SAMWindow(gtk.Window):
                 return user_list[0]
             else:
                 return None
-
+    #test
     def get_selected_group(self):
         if not self.connected():
             return None
@@ -1325,3 +1327,4 @@ if __name__ == "__main__":
     main_window = SAMWindow(**arguments)
     main_window.show_all()
     gtk.main()
+

@@ -11,10 +11,16 @@ import gtk.glade
 import os.path
 import getopt
 
+sys.path.append('/usr/local/samba/lib/python2.7/site-packages/')
+# for use against the default binaries from default .configure.developer for use on python 2.7
+# Uncomment the above line if it is yor your config , else edit it as required
+
+
 import pygwsam
 import pygwregedit
 import pygwcrontab
 import pygwsvcctl
+import pygwshare
 
 from sambagtk.dialogs import AboutDialog
 from sambagtk.sam import SAMConnectDialog
@@ -33,6 +39,8 @@ class SambaUtilities(object):
         self.regedit_window = None
         self.svcctl_window = None
         self.crontab_window = None
+        self.srvsvc_window = None
+        self.srvsvc_init= False
 
         self.connection_args = connection_args
         self.additional_connection_args = {} #arguments not supported by all utilities, such as domain_index
@@ -97,6 +105,7 @@ class SambaUtilities(object):
         self.svcctl_viewport = builder.get_object("svcctl_viewport")
         self.crontab_viewport = builder.get_object("crontab_viewport")
         self.regedit_viewport = builder.get_object("regedit_viewport")
+        self.srvsvc_viewport = builder.get_object("srvsvc_viewport")
 
         self.progressbar = builder.get_object("progressbar")
         self.statusbar = builder.get_object("statusbar")
@@ -120,6 +129,25 @@ class SambaUtilities(object):
         self.sam_window.statusbar = self.statusbar #we simply tell the utility to use our status bar instead
 
         self.set_status("User tab initialized.")
+        self.update_sensitivity()
+
+    def init_srvsvc_page(self):
+
+        args = self.connection_args.copy()
+        if self.additional_connection_args.has_key("info_callback"):
+            args.update({"info_callback":self.additional_connection_args["info_callback"]})
+
+        self.srvsvc_window = pygwshare.ShareWindow(**args) #start up the utility
+        self.srvsvc_window.share_notebook.reparent(self.srvsvc_viewport) #reparent the main widget into a notebook tab
+        self.srvsvc_viewport.show_all() #unhide all widgets
+
+        #We'll be displaying this later. We need to unparent it before attaching it to another container
+
+        self.srvsvc_window.menubar.unparent()
+        self.srvsvc_window.toolbar.unparent()
+        self.srvsvc_window.statusbar = self.statusbar #we simply tell the utility to use our status bar instead
+
+        self.set_status("Share Manager tab initialized.")
         self.update_sensitivity()
 
     def init_regedit_page(self):
@@ -175,6 +203,9 @@ class SambaUtilities(object):
     def regedit_initialized(self):
         return self.regedit_window is not None
 
+    def srvsvc_initialized (self):
+        return self.srvsvc_window is not None
+
     def svcctl_initialized(self):
         return self.svcctl_window is not None
 
@@ -183,11 +214,12 @@ class SambaUtilities(object):
 
     def update_sensitivity(self):
         sam_connected = self.sam_initialized() and self.sam_window.connected()
+        srvsvc_connected = self.srvsvc_initialized() and self.srvsvc_window.connected()
         regedit_connected = self.regedit_initialized() and self.regedit_window.connected()
         svcctl_connected = self.svcctl_initialized() and self.svcctl_window.connected()
         crontab_connected = self.crontab_initialized() and self.crontab_window.connected()
-        all_connected = sam_connected and regedit_connected and svcctl_connected and crontab_connected
-        all_disconnected = (not sam_connected) and (not regedit_connected) and (not svcctl_connected) and (not crontab_connected)
+        all_connected = sam_connected and regedit_connected and svcctl_connected and crontab_connected and srvsvc_connected
+        all_disconnected = (not sam_connected) and (not regedit_connected) and (not svcctl_connected) and (not crontab_connected) and (not srvsvc_connected)
 
         self.connect_all_button.set_sensitive(not all_connected)
         self.disconnect_all_button.set_sensitive(not all_disconnected)
@@ -204,6 +236,8 @@ class SambaUtilities(object):
             connected_utilities = []
             if sam_connected:
                 connected_utilities.append("User Manager")
+            if srvsvc_connected:
+                connected_utilities.append("Share Manager")
             if regedit_connected:
                 connected_utilities.append("Registry Editor")
             if svcctl_connected:
@@ -300,10 +334,12 @@ class SambaUtilities(object):
         if current_page == 1:
             self.sam_window.on_key_press(widget, event)
         elif current_page == 2:
-            self.regedit_window.on_key_press(widget, event)
+            self.srvsvc_window.on_key_press(widget, event)
         elif current_page == 3:
-            self.svcctl_window.on_key_press(widget, event)
+            self.regedit_window.on_key_press(widget, event)
         elif current_page == 4:
+            self.svcctl_window.on_key_press(widget, event)
+        elif current_page == 5:
             self.crontab_window.on_key_press(widget, event)
 
     def on_utility_notebook_switch_page(self, widget, page, page_num):
@@ -338,7 +374,26 @@ class SambaUtilities(object):
             self.toolbar_viewport.add(self.sam_window.toolbar)
             self.toolbar_viewport.show_all()
 
-        elif page_num == 2: #Regedit page
+
+        elif page_num == 2: #Share page
+            if self.srvsvc_viewport.child == None:
+                self.init_srvsvc_page()
+
+            #Menubar
+            children = self.menubar_viewport.get_children()
+            self.menubar_viewport.remove(children[0])
+            self.menubar_viewport.add(self.srvsvc_window.menubar)
+            self.menubar_viewport.show_all()
+
+            #Toolbar
+            children = self.toolbar_viewport.get_children()
+            self.toolbar_viewport.remove(children[0])
+            self.toolbar_viewport.add(self.srvsvc_window.toolbar)
+            self.toolbar_viewport.show_all()
+
+            self.srvsvc_window.hide()
+
+        elif page_num == 3: #Regedit page
             if self.regedit_viewport.child == None:
                 self.init_regedit_page()
 
@@ -354,7 +409,7 @@ class SambaUtilities(object):
             self.toolbar_viewport.add(self.regedit_window.toolbar)
             self.toolbar_viewport.show_all()
 
-        elif page_num == 3: #Services page
+        elif page_num == 4: #Services page
             if self.svcctl_viewport.child == None:
                 self.init_svcctl_page()
 
@@ -370,7 +425,7 @@ class SambaUtilities(object):
             self.toolbar_viewport.add(self.svcctl_window.toolbar)
             self.toolbar_viewport.show_all()
 
-        elif page_num == 4: #Crontab page
+        elif page_num == 5: #Crontab page
             if self.crontab_viewport.child == None:
                 self.init_crontab_page()
 
@@ -397,6 +452,12 @@ class SambaUtilities(object):
             else:
                 self.init_sam_page()
 
+            if self.srvsvc_initialized():
+                if not self.srvsvc_window.connected():
+                    self.srvsvc_window.on_connect_item_activate(None, **self.connection_args)
+            else:
+                self.init_srvsvc_page()
+
             if self.regedit_initialized():
                 if not self.regedit_window.connected():
                     self.regedit_window.on_connect_item_activate(None, **self.connection_args)
@@ -422,6 +483,8 @@ class SambaUtilities(object):
     def on_disconnect_all_button_clicked(self, widget):
         if self.sam_initialized():
             self.sam_window.on_disconnect_item_activate(None)
+        if self.srvsvc_initialized():
+            self.srvsvc_window.on_disconnect_item_activate(None)
         if self.regedit_initialized():
             self.regedit_window.on_disconnect_item_activate(None)
         if self.svcctl_initialized():
@@ -495,3 +558,4 @@ if __name__ == "__main__":
     main_window = SambaUtilities(arguments)
     sys.stdout = main_window #redirect print statements to the write() function of this class
     gtk.main()
+
