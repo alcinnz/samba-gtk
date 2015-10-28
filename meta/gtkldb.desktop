@@ -2,7 +2,7 @@
 Name=LDB Browser
 Comment=Lightweight Database browser and editor
 Exec=gtkldb
-#Icon=media-player-48.png
+Icon=/usr/share/samba-gtk/samba-logo-square.png
 Type=Application
 Terminal=false
 Categories=GNOME;GTK;RemoteAccess;System;Utility;Network;

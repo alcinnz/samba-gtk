@@ -2,7 +2,7 @@
 Name=DCE/RPC Endpoint Dumper
 Comment=Show DCE/RPC endpoint mapper
 Exec=gepdump
-#Icon=media-player-48.png
+Icon=/usr/share/samba-gtk/samba-logo-square.png
 Type=Application
 Terminal=false
 Categories=GNOME;GTK;RemoteAccess;Profiling;Utility;Network;Development;

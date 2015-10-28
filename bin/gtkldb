@@ -28,6 +28,7 @@
 
 from gi.repository import Gtk
 from gi.repository import GObject
+from sambagtk.dialogs import get_default_logo
 import ldb
 import os
 import sys
@@ -75,9 +76,7 @@ class LdbBrowser(Gtk.Window):
     def create(self):
         self.set_title("Sambagtk Ldb Browser Utility")
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], "images",
-                                            "samba-logo-small.png")
-        self.set_icon_from_file(self.icon_filename)
+        self.set_icon_from_file(get_default_logo("samba-logo-square"))
         accel_group = Gtk.AccelGroup()
 
         vbox = Gtk.VBox(False, 0)

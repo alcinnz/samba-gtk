@@ -34,7 +34,7 @@ import getopt
 
 from gi.repository import Gtk
 from gi.repository import GObject
-from sambagtk.dialogs import AboutDialog,ConnectDialog
+from sambagtk.dialogs import AboutDialog,ConnectDialog,get_default_logo
 from samba import credentials
 from samba.dcerpc import mgmt, epmapper, misc
 
@@ -59,9 +59,7 @@ class EndpointBrowser(Gtk.Window):
 
         self.set_title("Sambagtk Endpoint Mapper Viewer Utility")
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], "images",
-                                            "samba-logo-small.png")
-        self.set_icon_from_file(self.icon_filename)
+        self.set_icon_from_file(get_default_logo("samba-logo-square"))
         accel_group = Gtk.AccelGroup()
 
         main_vbox = Gtk.VBox(False, 0)
