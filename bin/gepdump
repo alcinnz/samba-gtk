@@ -59,7 +59,7 @@ class EndpointBrowser(Gtk.Window):
 
         self.set_title("Sambagtk Endpoint Mapper Viewer Utility")
         self.set_default_size(800, 600)
-        self.set_icon_from_file(get_default_logo("samba-logo-square"))
+##        self.set_icon_from_file(get_default_logo("samba-logo-square"))
         accel_group = Gtk.AccelGroup()
 
         main_vbox = Gtk.VBox(False, 0)

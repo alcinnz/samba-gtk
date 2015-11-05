@@ -61,7 +61,16 @@ class LdbURLDialog(Gtk.Dialog):
             return (url,True)
 
         
+def get_rdn(dn):
+    """Get relative distinguished name.
 
+    dn --- distinguished name
+    """
+    _len = dn.find(",")
+    if _len == -1:
+        return dn
+    else:
+        return dn[:_len]
 
 
 class LdbBrowser(Gtk.Window):
@@ -70,7 +79,10 @@ class LdbBrowser(Gtk.Window):
     def __init__(self):
         super(LdbBrowser, self).__init__()
         self.url_store = Gtk.ListStore(int, str) #for history
+        self.ldb = None
         self.url_store_count =0
+        self.cur_selected_dn = None
+        self.search_result = None
         self.create()
 
     def create(self):
@@ -82,7 +94,7 @@ class LdbBrowser(Gtk.Window):
         vbox = Gtk.VBox(False, 0)
         self.add(vbox)
 
-        # Menu
+        # Menu TODO add Edit->Find menu items
         self.menubar = Gtk.MenuBar()
         vbox.pack_start(self.menubar, False, False, 0)
 
@@ -94,18 +106,15 @@ class LdbBrowser(Gtk.Window):
 
         self.connect_item = Gtk.ImageMenuItem.new_from_stock(
                                                 Gtk.STOCK_CONNECT, accel_group)
-        self.connect_item.set_always_show_image(True)
         file_menu.add(self.connect_item)
 
         self.open_item = Gtk.ImageMenuItem.new_from_stock(
                                              Gtk.STOCK_OPEN, accel_group)
-        self.open_item.set_always_show_image(True)
         file_menu.add(self.open_item)
 
         self.disconnect_item = Gtk.ImageMenuItem.new_from_stock(
                                              Gtk.STOCK_DISCONNECT, accel_group)
         self.disconnect_item.set_sensitive(False)
-        self.disconnect_item.set_always_show_image(True)
         file_menu.add(self.disconnect_item)
 
         menu_separator_item = Gtk.SeparatorMenuItem()
@@ -114,7 +123,6 @@ class LdbBrowser(Gtk.Window):
 
         self.quit_item = Gtk.ImageMenuItem.new_from_stock(
                                                    Gtk.STOCK_QUIT, accel_group)
-        self.quit_item.set_always_show_image(True)
         file_menu.add(self.quit_item)
 
         self.view_item = Gtk.MenuItem.new_with_mnemonic('_View')
@@ -132,36 +140,51 @@ class LdbBrowser(Gtk.Window):
 
         pane = Gtk.HPaned()
         pane.set_position(200)
-        vbox.pack_start(pane, True, True, 6)
+        vbox.pack_start(pane, True, True, 0)
 
+        #   tree view
         self.treeview = Gtk.TreeView()
-        self.treemodel = Gtk.TreeStore(GObject.TYPE_STRING,
-                                      GObject.TYPE_PYOBJECT)
+        self.treemodel = Gtk.TreeStore(GObject.TYPE_STRING, # caption
+                                      GObject.TYPE_PYOBJECT, # dn
+                                      GObject.TYPE_BOOLEAN) # editable
         self.treeview.set_model(self.treemodel)
         self.treeview.set_headers_visible(False)
+        dn_renderer = Gtk.CellRendererText()
         self.treeview.append_column(Gtk.TreeViewColumn("_Dn",
-                                    Gtk.CellRendererText(), text=0))
+                                    dn_renderer, text=0, editable=2))
+        
+        # This class makes GtkLDB look nicer on elementary theme. 
+        # Feel free to set additional classes for other themes.  
+        self.treeview.get_style_context().add_class("source-list")
 
-        self.attributeview = Gtk.TreeView()
-        self.attributemodel = Gtk.ListStore(str, str, GObject.TYPE_PYOBJECT)
-        self.attributeview.set_model(self.attributemodel)
-        self.attributeview.append_column(Gtk.TreeViewColumn("_Name",
-                                         Gtk.CellRendererText(), text=0))
-        self.attributeview.append_column(Gtk.TreeViewColumn("_Value",
-                                         Gtk.CellRendererText(), text=1))
-
-
+        # TODO Add an infobar to display errors. 
         treeview_window = Gtk.ScrolledWindow()
         treeview_window.add(self.treeview)
         pane.pack1(treeview_window, resize=False, shrink=True)
+        
+        #   Attribute view
+        attribute_box = Gtk.VBox()
+        self.dn_label = Gtk.Label()
+        self.dn_label.set_padding(0, 5)
+        self.dn_label.set_alignment(Gtk.Justification.LEFT, 
+                                    Gtk.Justification.CENTER)
+        self.dn_label.set_selectable(True)
+        attribute_box.pack_start(self.dn_label, False, False, 4)
+        
+        self.attributeview = Gtk.TreeView()
+        self.attributemodel = Gtk.ListStore(str, str, GObject.TYPE_BOOLEAN)
+        self.attributeview.set_model(self.attributemodel)
+        name_renderer = Gtk.CellRendererText()
+        self.attributeview.append_column(Gtk.TreeViewColumn("_Name",
+                                         name_renderer, text=0, editable=2))
+        value_renderer = Gtk.CellRendererText()
+        self.attributeview.append_column(Gtk.TreeViewColumn("_Value",
+                                         value_renderer, text=1, editable=2))
 
         attributeview_window = Gtk.ScrolledWindow()
         attributeview_window.add(self.attributeview)
-        pane.pack2(attributeview_window, shrink=True)
-
-        #statusbar
-        self.statusbar = Gtk.Statusbar()
-        vbox.pack_end(self.statusbar, False, False, 0)
+        attribute_box.pack_start(attributeview_window, True, True, 6)
+        pane.pack2(attribute_box, shrink=True)
 
         # signals and connections
 
@@ -173,6 +196,15 @@ class LdbBrowser(Gtk.Window):
         self.quit_item.connect("activate", self.on_quit_item_activate)
 
         self.hide_special.connect('toggled', self.toggle_special_entries)
+        
+        self.treeview.connect('button_press_event', self._dn_button_press)
+        dn_renderer.connect('edited', self._dn_cell_edited)
+        self.treeview.connect('cursor_changed', self._dn_cursor_changed)
+        
+        # TODO implement these
+        self.attributeview.connect('button_press_event', self._msg_button_press)
+        name_renderer.connect('edited', self._msg_cell_edited, 0)
+        value_renderer.connect('edited', self._msg_cell_edited, 1)
 
         self.add_accel_group (accel_group)
 
@@ -222,11 +254,11 @@ class LdbBrowser(Gtk.Window):
         self.hide_special.set_sensitive(False)
         self.ldb = None
 
-    def fill_tree(self, hide_special=False):
+    def fill_tree(self):
         self.treemodel.clear()
         paths = {}
         def add_node(dn):
-            if dn.is_special() and hide_special:
+            if dn.is_special() and self.hide_special:
                 return None
             if paths.has_key(str(dn)):
                 return paths[str(dn)]
@@ -237,24 +269,304 @@ class LdbBrowser(Gtk.Window):
                 text = text[:-len(str(parent_dn))].rstrip(",")
             else:
                 parent = None
-            paths[str(dn)] = self.treemodel.append(parent, [text, dn])
+            paths[str(dn)] = self.treemodel.append(parent, [text, dn, True])
 
         for msg in self.ldb.search(None, ldb.SCOPE_SUBTREE, None, ["dn"]):
             add_node(msg.dn)
+    
+    def ldb_error_exception(self, err):
+        """Display information about an error."""
+        # TODO switch over to infobars. 
+        code, msg = err
+        
+        if code == 34: return # Skip the annoying "No messages found"
+        dialog = Gtk.MessageDialog(self, Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                        Gtk.MessageType.ERROR, Gtk.ButtonsType.CLOSE, str(msg))
+        dialog.set_title("LDB Error %d" % code)
+        dialog.connect('response', lambda d, r: d.destroy())
+        dialog.show()
+    
+    def refresh_attributes(self):
+        """Clear and fill an attribute widget."""
+        self.attributemodel.clear()
+        
+        if self.cur_selected_dn is None:
+            # TODO show a specific "empty" screen
+            self.dn_label.set_text("")
+        
+        try:
+            msg = self.ldb.search(self.cur_selected_dn, ldb.SCOPE_BASE)[0]
+        except IndexError:
+            self.dn_label.set_text("")
+            return # It's empty, ignore
+        except ldb.LdbError, err:
+            self.ldb_error_exception(err)
+            return
+        
+        self.dn_label.set_text(str(msg.dn))
+        for name, el in msg.items():
+            if name in ("dn", "distinguishedName"): continue
+            
+            el = (self.ldb.schema_format_value(name, val) for val in el)
+            for val in el:
+                self.attributemodel.append([name, val, True])
 
     def toggle_special_entries(self, item):
-        self.fill_tree(item.get_active())
-
-    def treeview_cursor_cb(self, item):
+        self.hide_special = item.get_active()
+        self.fill_tree()
+    
+    def _dn_button_press(self, treeview, event):
+        """Show right click popup menu to add or delete an element."""
+        
+        def add_dn(dn):
+            """Event handler "Add" menu item."""
+            dn_dialog = Gtk.Dialog(parent=self,
+                            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                    Gtk.STOCK_ADD, Gtk.ResponseType.OK))
+            dn_entry = Gtk.Entry()
+            dn_entry.set_text(str(dn))
+            dn_dialog.vbox.add(dn_entry)
+            dn_dialog.set_title("Enter DN:")
+            dn_dialog.show_all()
+            
+            if dn_dialog.run() == Gtk.ResponseType.OK:
+                dn = dn_entry.get_text()
+                try:
+                    msg = ldb.Message(ldb.Dn(self.ldb, dn))
+                    self.ldb.add(msg)
+                except (ldb.LdbError, ValueError), err:
+                    # TODO Gtk now provides a nice infobar to use instead of a dialog
+                    dialog = Gtk.MessageDialog(self, 
+                                    Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                                    Gtk.MessageType.ERROR, Gtk.ButtonsType.CLOSE,
+                                    str(err))
+                    dialog.connect('response', lambda d, r: d.destroy())
+                    dialog.show()
+                self.fill_tree()
+            dn_dialog.destroy()
+        
+        def delete_dn(dn):
+            try:
+                print dn
+                self.ldb.delete(ldb.Dn(self.ldb, str(dn)))
+            except (ldb.LdbError, ValueError), err:
+                # TODO Gtk now provides a nice infobar to use instead of a dialog
+                dialog = Gtk.MessageDialog(self, 
+                                Gtk.DialogFlags.DESTROY_WITH_PARENT,
+                                Gtk.MessageType.ERROR, Gtk.ButtonsType.CLOSE,
+                                str(err))
+                dialog.connect('response', lambda d, r: d.destroy())
+                dialog.show()
+            self.fill_tree()
+            self.cur_selected_dn = None
+            self.refresh_attributes()
+        
+        # This event handler depends on self.ldb
+        if self.ldb is None: return
+        
+        if event.button == 3:
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pthinfo = treeview.get_path_at_pos(x, y)
+            
+            popup = Gtk.Menu()
+            popup.attach_to_widget(treeview)
+            if pthinfo is not None:
+                path, col, cellx, celly = pthinfo
+                path_str = ":".join(map(str, path))
+                iter = self.treemodel.get_iter_from_string(path_str)
+                
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, 0)
+                
+                dn = self.treemodel[iter][1]
+                
+                # Now create the menu for items
+                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD)
+                el.connect('activate', lambda x: add_dn(dn))
+                popup.add(el)
+                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE)
+                el.connect('activate', lambda x: delete_dn(dn))
+                popup.add(el)
+            else:
+                # Create the menu for the sidebar
+                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD)
+                el.connect('activate', lambda x: add_dn(""))
+                popup.add(el)
+            popup.show_all()
+            popup.popup(None, None, None, None, event.button, time)
+            return True
+  
+    def _dn_cell_edited(self, renderer, path_string, new_rdn):
+        """Rename an element"""
+        iter = self.treemodel.get_iter_from_string(path_string)
+        
+        old_dn = self.treemodel[iter][1]
+        old_rdn = get_rdn(str(old_dn))
+        
+        if old_rdn == new_rdn: return
+        
+        # TODO need to handle hierarchical trees, but not sure how to handle it. 
+##        parent_dn = self.tree.parent[old_dn]
+##        
+##        if parent_dn != "":
+##            new_dn = new_rdn + "," + parent_dn
+##        else:
+##            new_dn = new_rdn
+        
+        try:
+            self.ldb.rename(ldb.Dn(self.ldb, old_dn), new_dn)
+        except ldb.LdbError, err:
+            self.ldb_error_exception(err)
+            return
+        
+        self.fill_tree()
+        
+    def _dn_cursor_changed(self, item):
+        """Change currently selected dn and refresh attributes"""
         (model, iter) = item.get_selection().get_selected()
-        dn = model.get_value(iter, 1)
-        self.attributemodel.clear()
-        msg = self.ldb.search(dn, ldb.SCOPE_BASE)[0]
-        for name, el in msg.iteritems():
-            if name == "dn":
-                continue
-            for val in set(el):
-                self.attributemodel.append([name, val, el])
+        if iter == None:
+            self.cur_selected_dn = None
+        else:
+            self.cur_selected_dn = model.get_value(iter, 1)
+        self.refresh_attributes()
+        
+    def _msg_button_press(self, treeview, event):
+        """Show right click popup menu to add or delete an element."""
+        
+        def add_attr():
+            """Callback for the "Add" menuitem"""
+            dialog = Gtk.Dialog(self, 
+                        buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                                Gtk.STOCK_ADD, Gtk.ResponseType.OK))
+            attr_entry = Gtk.Entry()
+            attr_entry.set_text("Name")
+            dialog.vbox.add(attr_entry)
+            value_entry = Gtk.Entry()
+            value_entry.set_text("Value")
+            dialog.vbox.add(value_entry)
+            dialog.show_all()
+            
+            if dialog.run() == Gtk.ResponseType.OK:
+                attr = attr_entry.get_text()
+                value = value_entry.get_text()
+                
+                m = ldb.Message()
+                m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+                m[attr] = ldb.MessageElement(value, ldb.CHANGETYPE_ADD, attr)
+                
+                try:
+                    self.ldb.modify(m)
+                except ldb.LdbError, err:
+                    self.ldb_error_exception(err)
+                    return
+                
+                self.refresh_attributes()
+            dialog.destroy()
+        
+        def delete_attr(dn, attr, value):
+            """Callback for the "Remove" menuitem"""
+            m = ldb.Message()
+            m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+            m[attr] = ldb.MessageElement(value, ldb.CHANGETYPE_MODIFY, attr)
+            
+            try:
+                self.ldb.modify(m)
+            except ldb.LdbError, err:
+                self.ldb_error_exception(err)
+                return
+            
+            self.refresh_attributes()
+        
+        # Depends on self.cur_selected_dn
+        if self.cur_selected_dn is None: return
+        
+        if event.button == 3:
+            x = int(event.x)
+            y = int(event.y)
+            time = event.time
+            pthinfo = treeview.get_path_at_pos(x,y)
+            
+            popup = Gtk.Menu()
+            popup.attach_to_widget(treeview)
+            if pthinfo is not None:
+                path, col, cellx, celly = pthinfo
+                path_str = ":".join(map(str, path))
+                iter = self.attributemodel.get_iter_from_string(path_str)
+                
+                treeview.grab_focus()
+                treeview.set_cursor(path, col, 0)
+                
+                dn = self.cur_selected_dn
+                attr, value, editable = self.attributemodel[iter]
+                
+                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE)
+                el.connect('activate', lambda x: delete_attr(dn, attr, value))
+                popup.add(el)
+            else:
+                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD)
+                el.connect('activate', lambda x: add_attr())
+                popup.add(el)
+            popup.show_all()
+            popup.popup(None, None, None, None, event.button, time)
+            return True
+   
+    def _msg_cell_edited(self, cell, path_string, text, column):
+        """Edit the element."""
+        iter = self.attributemodel.get_iter_from_string(path_string)
+        old_attr, old_value, editable = self.attributemodel[iter]
+        
+        if column == 0: # Edited name
+            if text == old_attr: return
+            
+            m = ldb.Message()
+            m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+            m[old_attr] = ldb.MessageElement(old_value, ldb.CHANGETYPE_MODIFY,
+                                            old_attr)
+            
+            try:
+                self.ldb.modify(m)
+            except ldb.LdbError, err:
+                self.ldb_error_exception(err)
+                return
+            
+            m = ldb.Message()
+            m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+            m[text] = ldb.MessageElement(old_value, ldb.CHANGETYPE_ADD, text)
+            
+            try:
+                self.ldb.modify(m)
+            except ldb.LdbError, err:
+                self.ldb_error_exception(err)
+                return
+        elif column == 1: # Edited value
+            if text == old_value: return
+            
+            m = ldb.Message()
+            m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+            m[old_attr] = ldb.MessageElement(old_value, ldb.CHANGETYPE_MODIFY,
+                                            old_attr)
+            
+            try:
+                self.ldb.modify(m)
+            except ldb.LdbError, err:
+                self.ldb_error_exception(err)
+                return
+            
+            m = ldb.Message()
+            m.dn = ldb.Dn(self.ldb, str(self.cur_selected_dn))
+            m[old_attr] = ldb.MessageElement(text, ldb.CHANGETYPE_ADD, old_attr)
+            
+            try:
+                self.ldb.modify(m)
+            except ldb.LdbError, err:
+                self.ldb_error_exception(err)
+                return
+        else:
+            print "Edited nonexistant column #%i" % column # Shouldn't happen
+            return
+        self.refresh_attributes()
 
 def Ldb(url):
     """Create a new LDB object.
