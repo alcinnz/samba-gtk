@@ -2,7 +2,7 @@
 Name=Registry Editor
 Comment=Edit Windows-Style Registry files
 Exec=gregedit
-Icon=/usr/share/samba-gtk/samba-logo-square.png
+Icon=samba
 Terminal=false
 Type=Application
 Categories=GNOME;GTK;RemoteAccess;Utility;Network;

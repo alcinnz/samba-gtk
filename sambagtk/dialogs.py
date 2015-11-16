@@ -45,7 +45,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>."""
         authors = ["Sergio Martins <Sergio97@gmail.com>",
                     "Calin Crisan <ccrisan@gmail.com>",
                     "Dhananjay Sathe <dhananajaysathe@gmail.com>",
-                    "Jelmer Vernooij <jelmer@samba.org>"]
+                    "Jelmer Vernooij <jelmer@samba.org>",
+                    "Adrian Cochrane <adrianc@catalyst.net.nz>"]
         copyright_text = "Copyright \xc2\xa9 2012 Dhananjay Sathe <dhananjaysathe@gmail.com>"
 
         self.set_property("program-name",name)
