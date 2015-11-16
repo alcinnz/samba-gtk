@@ -434,10 +434,10 @@ class LdbBrowser(Gtk.Window):
     def cb_search(self, entry):
         search = entry.get_text()
         self.treemodel.clear()
-        
+
         for msg in self.ldb.search(None, ldb.SCOPE_SUBTREE, search, ["dn"]):
             dn = msg.dn
-            self.treemodel.append(None, [str(dn), False, str(dn),
+            self.treemodel.append(None, [str(dn), dn, False, str(dn),
                                         dn.is_special()])
     
     # BEGIN DN TREE LOADING
@@ -708,10 +708,11 @@ class LdbBrowser(Gtk.Window):
         
         parent_iter = self.treemodel.iter_parent(iter.copy())
         if parent_iter:
-            new_dn += "," + self.treemodel.get(parent_iter, ldbTree.PATH)[0]
+            parent_dn = self.treemodel.get(parent_iter, LdbTree.PATH)[0]
+            new_dn = new_rdn + "," + parent_dn
         
         try:
-            self.ldb.rename(ldb.Dn(self.ldb, old_dn), new_dn)
+            self.ldb.rename(ldb.Dn(self.ldb, str(old_dn)), new_dn)
         except ldb.LdbError, err:
             self.ldb_error_exception(err)
             return
