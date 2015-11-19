@@ -29,6 +29,7 @@
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GObject
+from gi.repository import GLib
 from sambagtk.dialogs import get_default_logo, AboutDialog
 from sambagtk import moderngtk
 import gettext
@@ -121,7 +122,6 @@ class LdbBrowser(Gtk.Window):
     def create(self):
         self.set_title(_("Sambagtk Ldb Browser Utility"))
         self.set_default_size(800, 600)
-        self.set_icon_from_file(get_default_logo("samba-logo-square"))
         accel_group = Gtk.AccelGroup()
 
         vbox = Gtk.VBox(False, 0)
@@ -303,11 +303,18 @@ class LdbBrowser(Gtk.Window):
         self.attributemodel = Gtk.ListStore(str, str, GObject.TYPE_BOOLEAN)
         self.attributeview.set_model(self.attributemodel)
         name_renderer = Gtk.CellRendererText()
-        self.attributeview.append_column(Gtk.TreeViewColumn(_("_Name"),
-                                         name_renderer, text=0, editable=2))
+        cur_col = Gtk.TreeViewColumn(_("_Name"), name_renderer,
+                                    text=0, editable=2)
+        cur_col.set_sort_column_id(0)
+        cur_col.set_resizable(True)
+        self.attributeview.append_column(cur_col)
         value_renderer = Gtk.CellRendererText()
-        self.attributeview.append_column(Gtk.TreeViewColumn(_("_Value"),
-                                         value_renderer, text=1, editable=2))
+        cur_col = Gtk.TreeViewColumn(_("_Value"), value_renderer,
+                                    text=1, editable=2)
+        cur_col.set_sort_column_id(1)
+        cur_col.set_resizable(True)
+        self.attributeview.append_column(cur_col)
+        self.attributeview.set_headers_clickable(True)
 
         attributeview_window = Gtk.ScrolledWindow()
         attributeview_window.add(self.attributeview)
@@ -927,6 +934,7 @@ def Ldb(url):
 
 
 if __name__ == '__main__':
+    GLib.set_prgname("gtkldb")
 
     browser = LdbBrowser()
     if len(sys.argv) > 1:
