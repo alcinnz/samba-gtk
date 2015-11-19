@@ -42,8 +42,7 @@ class LdbTree(object):
     DN = 1
     EDITABLE = 2
     PATH = 3
-    IS_SPECIAL = 4
-    EXPANDABLE_CHECKED = 5
+    ISNT_SPECIAL = 4
     
 class EditorDialog(Gtk.Dialog):
     """Dialog wrapping a Gtk.TextView."""
@@ -438,7 +437,7 @@ class LdbBrowser(Gtk.Window):
         for msg in self.ldb.search(None, ldb.SCOPE_SUBTREE, search, ["dn"]):
             dn = msg.dn
             self.treemodel.append(None, [str(dn), dn, False, str(dn),
-                                        dn.is_special()])
+                                        not dn.is_special()])
     
     # BEGIN DN TREE LOADING
     def fill_tree(self):
@@ -455,8 +454,11 @@ class LdbBrowser(Gtk.Window):
         if basedn:
             self.tree_append(basedn)
             return
-        
-        msgs = self.ldb.search(None, ldb.SCOPE_SUBTREE, None, ["dn"])
+        try:
+            msgs = self.ldb.search(None, ldb.SCOPE_SUBTREE, None, ["dn"])
+        except ldb.LdbError, err:
+            self.infobar.display_message(err)
+            return
         knownDNs = set(str(msg.dn) for msg in msgs)
         
         for msg in msgs:
@@ -480,16 +482,20 @@ class LdbBrowser(Gtk.Window):
         else:
             name = text
         child = self.treemodel.append(tree_parent, [name, dn, True, text,
-                                                    dn.is_special()])
+                                                    not dn.is_special()])
         
         # Check if DN has any children and if so add a dummy row.
-        if len(self.ldb.search(dn, ldb.SCOPE_ONELEVEL, None, ["dn"])):
-            # The dummy has all falsy values. 
-            self.treemodel.append(child, ["", None, False, "", False])
+        try:
+            if len(self.ldb.search(dn, ldb.SCOPE_ONELEVEL, None, ["dn"])):
+                # The dummy has all falsy values.
+                self.treemodel.append(child, ["", None, False, "", False])
+        except ldb.LdbError, err:
+            self.infobar.display_message(err[1], Gtk.MessageType.WARNING)
     
     # TODO This approach to lazy loading is an ugly hack.
     #       The proper way is to subclass Gtk.TreeModel,
-    #       but the Python bindings would not let me do that. 
+    #       but the Python bindings would not support that.
+    # This hack is blocking drag and drop support.
     def tree_expand(self, treeview, iter_, path):
         # Quick exit if node needs no further expansion.
         child_iter = self.treemodel.iter_children(iter_)
@@ -542,8 +548,12 @@ class LdbBrowser(Gtk.Window):
         self.attribute_add_item.set_sensitive(True)
 
     def toggle_special_entries(self, item):
-        self.hide_special = item.get_active()
-        self.fill_tree()
+        if item.get_active():
+            filtermodel = Gtk.TreeModelFilter(child_model=self.treemodel)
+            filtermodel.set_visible_column(LdbTree.ISNT_SPECIAL)
+            self.treeview.set_model(filtermodel)
+        else:
+            self.treeview.set_model(self.treemodel)
     
     # START DN EDITTING
     def set_dn_toolbar_sensitive(self, sensitive):
@@ -577,10 +587,16 @@ class LdbBrowser(Gtk.Window):
             dn = dn_entry.get_text()
             try:
                 msg = ldb.Message(ldb.Dn(self.ldb, dn))
+                # (Until recently) LDB fails when the msg has no attributes
+                # so add a default "name" attribute.
+                name = dn.split(",")[0]
+                name = name[3:] # Chop off dn=, etc. 
+                msg["name"] = name
                 self.ldb.add(msg)
             except (ldb.LdbError, ValueError), err:
                 self.infobar.display_message(err)
-            self.fill_tree()
+            else:
+                self.fill_tree()
         dn_dialog.destroy()
     
     def delete_dn_cb(self, button):
@@ -637,7 +653,7 @@ class LdbBrowser(Gtk.Window):
             try:
                 self.ldb.delete(ldb.Dn(self.ldb, str(dn)))
             except (ldb.LdbError, ValueError), err:
-                self.infobar.display_message(err)
+                self.infobar.display_message(err, Gtk.MessageType.WARNING)
             
             # And insert updated record
             try:
@@ -856,7 +872,7 @@ class LdbBrowser(Gtk.Window):
             try:
                 self.ldb.modify(m)
             except ldb.LdbError, err:
-                self.ldb_error_exception(err)
+                self.ldb_error_exception(err, Gtk.MessageType.WARNING)
                 return
             
             m = ldb.Message()
@@ -879,7 +895,7 @@ class LdbBrowser(Gtk.Window):
             try:
                 self.ldb.modify(m)
             except ldb.LdbError, err:
-                self.ldb_error_exception(err)
+                self.ldb_error_exception(err, Gtk.MessageType.WARNING)
                 return
             
             m = ldb.Message()
