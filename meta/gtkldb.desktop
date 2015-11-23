@@ -1,9 +1,11 @@
 [Desktop Entry]
 Name=LDB Browser
-Comment=Lightweight Database browser and editor
-Exec=gtkldb
+Comment=Lightweight database browser and editor
+Exec=gtkldb %f
 Icon=samba
 Type=Application
 Terminal=false
-Categories=GNOME;GTK;RemoteAccess;System;Utility;Network;
+Categories=GNOME;GTK;RemoteAccess;System;Utility;Network;Database
 StartupNotify=true
+MimeType=application/x-ldb
+Keywords=Samba;LDAP

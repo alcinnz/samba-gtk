@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-ldb">
+        <comment xml:lang="en">LDB database</comment>
+        
+        <!-- NOTE: This icon is non-standard, but it's better than nothing. -->
+        <generic-icon name="office-database" />
+        <glob pattern="*.ldb"/>
+    </mime-type>
+</mime-info>
