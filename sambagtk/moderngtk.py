@@ -45,7 +45,7 @@ class InfoBar(Gtk.Revealer):
         self.label.set_markup(str(msg))
         self.set_reveal_child(True)
 
-def build_inline_toolbar(treeview=None):
+def build_inline_toolbar():
     toolbar = Gtk.Toolbar()
     
     toolbar.get_style_context().add_class("inline-toolbar") # For elementary
@@ -53,13 +53,4 @@ def build_inline_toolbar(treeview=None):
     toolbar.get_style_context().set_junction_sides(Gtk.JunctionSides.TOP)
     toolbar.set_icon_size(Gtk.IconSize.SMALL_TOOLBAR)
     
-    box = None
-    if treeview:
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.add(treeview)
-        
-        box = Gtk.VBox()
-        box.pack_start(scrolled, expand=True, fill=True, padding=0)
-        box.pack_start(toolbar, expand=False, fill=False, padding=0)
-    
-    return toolbar, box
+    return toolbar

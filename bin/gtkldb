@@ -31,39 +31,12 @@ from gi.repository import Gdk
 from gi.repository import GObject
 from gi.repository import GLib
 from sambagtk.dialogs import get_default_logo, AboutDialog
-from sambagtk import moderngtk
+from sambagtk import moderngtk, ldb_widgets as widgets
 import gettext
 gettext.install("gtkldb")
 import ldb
 import os
 import sys
-
-class LdbTree(object):
-    CAPTION = 0
-    DN = 1
-    EDITABLE = 2
-    PATH = 3
-    ISNT_SPECIAL = 4
-    
-class EditorDialog(Gtk.Dialog):
-    """Dialog wrapping a Gtk.TextView."""
-    def __init__(self, *args, **kwargs):
-        super(EditorDialog, self).__init__(*args, **kwargs)
-        self.set_default_size(650, 500)
-        
-        self.text = Gtk.TextBuffer()
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.add(Gtk.TextView.new_with_buffer(self.text))
-        self.vbox.pack_start(scrolled, expand=True, fill=True, padding=0)
-        self.set_default_response(Gtk.ResponseType.OK)
-        self.show_all()
-    
-    def get_text(self):
-        return self.text.get_text(self.text.get_start_iter(),
-                    self.text.get_end_iter(), False)
-    
-    def set_text(self, text):
-        self.text.set_text(text)
 
 class LdbURLDialog(Gtk.Dialog):
     """Dialog that prompts for a LDB URL.
@@ -93,18 +66,6 @@ class LdbURLDialog(Gtk.Dialog):
             entry = self.url_combo_entry.get_child()
             url = entry.get_text()
             return (url,True)
-
-        
-def get_rdn(dn):
-    """Get relative distinguished name.
-
-    dn --- distinguished name
-    """
-    _len = dn.find(",")
-    if _len == -1:
-        return dn
-    else:
-        return dn[:_len]
 
 
 class LdbBrowser(Gtk.Window):
@@ -175,42 +136,8 @@ class LdbBrowser(Gtk.Window):
         view_menu.show_all()
 
         #   find toolbar
-        self.find_revealer = Gtk.Revealer()
-        find_container = Gtk.HBox()
-        find_toolbar = Gtk.HBox()
-        find_toolbar.set_margin_top(2)
-        find_toolbar.set_margin_bottom(2)
-        find_container.pack_start(find_toolbar, expand=True, fill=True,
-                                    padding=0)
-        find_container.get_style_context().add_class("search-bar")
-        self.find_revealer.add(find_container)
-        self.find_revealer.set_reveal_child(False)
-        vbox.pack_start(self.find_revealer, expand=False, fill=False, padding=0)
-        
-        self.find_entry = Gtk.SearchEntry()
-        find_toolbar.pack_start(self.find_entry, expand=True, fill=True,
-                                padding=2)
-        find_toolbar.pack_start(Gtk.VBox(), expand=True, fill=True, padding=2)
-        
-##        self.find_keys = Gtk.CheckButton.new_with_label(_("Keys"))
-##        self.find_keys.set_tooltip_text(_("Search in keys"))
-##        find_toolbar.pack_start(self.find_keys, expand=False, fill=False,
-##                                padding=2)
-##        self.find_names = Gtk.CheckButton.new_with_label(_("Value Names"))
-##        self.find_names.set_tooltip_text(_("Search in value names"))
-##        find_toolbar.pack_start(self.find_names, expand=False, fill=False,
-##                                padding=2)
-##        self.find_values = Gtk.CheckButton.new_with_label(_("Value Contents"))
-##        self.find_values.set_tooltip_text(_("Search in value contents"))
-##        find_toolbar.pack_start(self.find_values, expand=False, fill=False,
-##                                padding=2)
-##        self.find_in_whole = Gtk.CheckButton.new_with_label(
-##                                                        _("Whole String Only"))
-##        self.find_in_whole.set_tooltip_text(_("Search whole string"))
-##        find_toolbar.pack_start(self.find_in_whole, expand=False, fill=False,
-##                                padding=2)
-        
-        find_toolbar.show_all()
+        self.find_bar = widgets.SearchBar(self.find_item)
+        vbox.pack_start(self.find_bar, expand=False, fill=False, padding=0)
 
         #infobar for error reporting
         self.infobar = moderngtk.InfoBar()
@@ -223,57 +150,8 @@ class LdbBrowser(Gtk.Window):
         vbox.pack_start(pane, expand=True, fill=True, padding=0)
 
         #   tree view
-        self.treeview = Gtk.TreeView()
-        self.treemodel = Gtk.TreeStore(GObject.TYPE_STRING, # caption
-                                        GObject.TYPE_PYOBJECT, # dn
-                                        GObject.TYPE_BOOLEAN, # editable
-                                        GObject.TYPE_STRING, # path
-                                        GObject.TYPE_BOOLEAN) # is special
-        self.treeview.set_model(self.treemodel)
-        self.treeview.set_headers_visible(False)
-        self.treeview.set_tooltip_column(LdbTree.PATH)
-        self.treemodel.set_sort_column_id(LdbTree.CAPTION,
-                                            Gtk.SortType.ASCENDING)
-        dn_renderer = Gtk.CellRendererText()
-        self.treeview.append_column(Gtk.TreeViewColumn(_("_Dn"),
-                                    dn_renderer, text=0, editable=2))
-        
-        # This class makes GtkLDB look nicer on the elementary OS theme. 
-        # Feel free to add additional classes for other themes.  
-        self.treeview.get_style_context().add_class('source-list')
-        
-        # Add an "inline" toolbar to make editting easier and more discoverable
-        treeview_toolbar, treeview_box = moderngtk.build_inline_toolbar(
-                self.treeview)
-        
-        self.treeview_add_item = Gtk.ToolButton(None, _("Create DN"))
-        self.treeview_add_item.set_icon_name('list-add-symbolic')
-        self.treeview_add_item.set_tooltip_text(
-                    _("Create a DN based on the currently selected DN"))
-        treeview_toolbar.add(self.treeview_add_item)
-        
-        self.treeview_remove_item = Gtk.ToolButton(None, _("Remove DN"))
-        self.treeview_remove_item.set_icon_name('list-remove-symbolic')
-        self.treeview_remove_item.set_tooltip_text(
-                    _("Remove currently selected DN"))
-        treeview_toolbar.add(self.treeview_remove_item)
-        
-        treeview_toolbar.add(Gtk.SeparatorToolItem())
-        
-        self.treeview_export_item = Gtk.ToolButton(None, _("Export LDIF"))
-        self.treeview_export_item.set_icon_name('document-export-symbolic')
-        self.treeview_export_item.set_tooltip_text(
-                    _("Save an LDIF file for the currently selected DN")) 
-        treeview_toolbar.add(self.treeview_export_item)
-        
-        self.treeview_edit_item = Gtk.ToolButton(None, _("Edit LDIF"))
-        self.treeview_edit_item.set_icon_name('edit-symbolic')
-        self.treeview_edit_item.set_tooltip_text(
-                    _("Edit LDIF for the currently selected DN"))
-        treeview_toolbar.add(self.treeview_edit_item)
-        
-        self.set_dn_toolbar_sensitive(False)
-        pane.pack1(treeview_box, resize=False, shrink=True)
+        self.dn_tree = widgets.DnTreeView()
+        pane.pack1(self.dn_tree, resize=False, shrink=True)
         
         #   Attribute view
         self.attribute_stack = Gtk.Stack()
@@ -322,7 +200,7 @@ class LdbBrowser(Gtk.Window):
                                 padding=6)
         
         #       Attribute toolbar
-        attribute_toolbar, __ = moderngtk.build_inline_toolbar()
+        attribute_toolbar = moderngtk.build_inline_toolbar()
         
         self.attribute_add_item = Gtk.ToolButton(None, _("Add Attribute"))
         self.attribute_add_item.set_icon_name('list-add-symbolic')
@@ -346,28 +224,22 @@ class LdbBrowser(Gtk.Window):
         self.connect_item.connect('clicked', self.cb_connect)
         self.open_item.connect('clicked', self.cb_open)
         self.disconnect_item.connect('clicked', self.cb_disconnect)
-        self.find_item.connect('clicked', self.cb_find)
 
         self.hide_special.connect('toggled', self.toggle_special_entries)
         about_item.connect('activate', self.show_about)
         
-        self.find_entry.connect('search-changed', self.cb_search)
+        self.find_bar.on_search_changed = self.dn_tree.search
+        self.find_bar.on_search_closed = \
+                lambda: self.dn_tree.set_search_mode(False)
         
-        self.treeview.connect('button_press_event', self.cb_dn_button_press)
-        dn_renderer.connect('edited', self.cb_dn_cell_edited)
-        self.treeview.connect('cursor_changed', self.cb_dn_cursor_changed)
-        self.treeview.connect('row-expanded', self.tree_expand)
+        self.dn_tree.on_dn_selected = self.cb_dn_cursor_changed
+        self.dn_tree.on_err = self.ldb_error_exception
         
         self.attributeview.connect('button_press_event', self.cb_msg_button_press)
         self.attributeview.connect('cursor_changed', self.msg_cursor_changed)
         name_renderer.connect('edited', self.cb_msg_cell_edited, 0)
         value_renderer.connect('edited', self.cb_msg_cell_edited, 1)
-        
-        self.treeview_add_item.connect('clicked', self.add_dn_cb)
-        self.treeview_remove_item.connect('clicked', self.delete_dn_cb)
-        self.treeview_export_item.connect('clicked', self.export_ldif_cb)
-        self.treeview_edit_item.connect('clicked', self.edit_ldif_cb)
-        
+
         self.attribute_add_item.connect('clicked', self.add_attr_cb)
         self.attribute_remove_item.connect('clicked', self.delete_attr_cb)
 
@@ -394,8 +266,7 @@ class LdbBrowser(Gtk.Window):
         self.disconnect_item.set_sensitive(True)
         self.find_item.set_sensitive(True)
         self.hide_special.set_sensitive(True)
-        self.treeview_add_item.set_sensitive(True)
-        self.fill_tree()
+        self.dn_tree.set_ldb(ldb)
 
     def cb_connect(self, button):
         dialog = LdbURLDialog(url_store = self.url_store)
@@ -427,103 +298,18 @@ class LdbBrowser(Gtk.Window):
         self.disconnect_item.set_sensitive(False)
         self.find_item.set_sensitive(False)
         self.hide_special.set_sensitive(False)
-        self.set_dn_toolbar_sensitive(False)
-        self.ldb = None
+        self.dn_tree.set_ldb(None)
     
-    def cb_find(self, button):
-        self.find_revealer.set_reveal_child(button.get_active())
-        self.find_entry.grab_focus()
-        
-        # Update the tree for the search mode.
-        self.fill_tree()
-    
-    def cb_search(self, entry):
-        search = entry.get_text()
-        self.treemodel.clear()
-
-        for msg in self.ldb.search(None, ldb.SCOPE_SUBTREE, search, ["dn"]):
-            dn = msg.dn
-            self.treemodel.append(None, [str(dn), dn, False, str(dn),
-                                        not dn.is_special()])
-    
-    # BEGIN DN TREE LOADING
-    def fill_tree(self):
-        # initiate a search instead if self.find_entry is active
-        if self.find_item.get_active():
-            self.cb_search(self.find_entry)
-            return
-
-        self.treemodel.clear()
-        
-        # Attempt to find the root in order to progressively load the tree. 
-        basedn = (self.ldb.get_default_basedn() or self.ldb.get_root_basedn() or 
-                  self.ldb.get_config_basedn() or self.ldb.get_schema_basedn())
-        if basedn:
-            self.tree_append(basedn)
-            return
-        try:
-            msgs = self.ldb.search(None, ldb.SCOPE_SUBTREE, None, ["dn"])
-        except ldb.LdbError, err:
-            self.infobar.display_message(err)
-            return
-        knownDNs = set(str(msg.dn) for msg in msgs)
-        
-        for msg in msgs:
-            dn = msg.dn
-            parent_dn = dn.parent()
-            has_parent = False
-            
-            while parent_dn and str(parent_dn):
-                if str(parent_dn) in knownDNs:
-                    has_parent = True
-                    break
-                parent_dn = parent_dn.parent()
+    def ldb_error_exception(self, err, msg=None, level=Gtk.MessageType.ERROR):
+        if msg is None:
+            if err is ldb.LdbError:
+                code, msg = err
                 
-            if not has_parent:
-                self.tree_append(dn)
-    
-    def tree_append(self, dn, tree_parent=None, dn_parent=""):
-        text = str(dn)
-        if dn_parent:
-            name = text[:-len(str(dn_parent))].rstrip(",")
-        else:
-            name = text
-        child = self.treemodel.append(tree_parent, [name, dn, True, text,
-                                                    not dn.is_special()])
-        
-        # Check if DN has any children and if so add a dummy row.
-        try:
-            if len(self.ldb.search(dn, ldb.SCOPE_ONELEVEL, None, ["dn"])):
-                # The dummy has all falsy values.
-                self.treemodel.append(child, ["", None, False, "", False])
-        except ldb.LdbError, err:
-            self.infobar.display_message(err[1], Gtk.MessageType.WARNING)
-    
-    # TODO This approach to lazy loading is an ugly hack.
-    #       The proper way is to subclass Gtk.TreeModel,
-    #       but the Python bindings would not support that.
-    # This hack is blocking drag and drop support.
-    def tree_expand(self, treeview, iter_, path):
-        # Quick exit if node needs no further expansion.
-        child_iter = self.treemodel.iter_children(iter_)
-        if not child_iter or self.treemodel.get(child_iter, 0)[0]:
-            return
-                
-        # Add new children
-        dn, dn_path = self.treemodel.get(iter_, LdbTree.DN, LdbTree.PATH)
-        for msg in self.ldb.search(dn, ldb.SCOPE_ONELEVEL, None, ["dn"]):
-            self.tree_append(msg.dn, iter_, dn_path)
-        
-        # Remove dummy child
-        self.treemodel.remove(child_iter)
-    # END DN TREE LOADING
-    
-    def ldb_error_exception(self, err):
-        """Display information about an error."""
-        code, msg = err
-        
-        if code == 34: return # Skip the annoying "No messages found"
-        self.infobar.display_message(_("<b>LDB Error %d</b> %s") % (code, msg))
+                if code == 34: return # Skip the annoying "No messages found"
+                msg = _("<b>LDB Error %d</b> %s") % (code, msg)
+            else:
+                msg = str(err)
+        self.infobar.display_message(msg, level)
     
     def refresh_attributes(self):
         """Clear and fill an attribute widget."""
@@ -532,6 +318,7 @@ class LdbBrowser(Gtk.Window):
         if self.cur_selected_dn is None:
             # TODO show a specific "empty" screen
             self.attribute_stack.set_visible_child_name("blank")
+            return
         else:
             self.attribute_stack.set_visible_child_name("attrs")
             
@@ -555,207 +342,11 @@ class LdbBrowser(Gtk.Window):
         self.attribute_add_item.set_sensitive(True)
 
     def toggle_special_entries(self, item):
-        if item.get_active():
-            filtermodel = Gtk.TreeModelFilter(child_model=self.treemodel)
-            filtermodel.set_visible_column(LdbTree.ISNT_SPECIAL)
-            self.treeview.set_model(filtermodel)
-        else:
-            self.treeview.set_model(self.treemodel)
-    
-    # START DN EDITTING
-    def set_dn_toolbar_sensitive(self, sensitive):
-        self.treeview_add_item.set_sensitive(sensitive)
-        self.treeview_remove_item.set_sensitive(sensitive)
-        self.treeview_export_item.set_sensitive(sensitive)
-        self.treeview_edit_item.set_sensitive(sensitive)
-        
-    def get_selected_dn(self):
-        path, column = self.treeview.get_cursor()
-        if path is None:
-            return ""
-        return self.treemodel.get(self.treemodel.get_iter(path), 1)
-    
-    def add_dn_cb(self, button):
-        self.add_dn(self.get_selected_dn())
-        
-    def add_dn(self, dn):
-        """Event handler "Add" menu item."""
-        dn_dialog = Gtk.Dialog(parent=self,
-                        buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                Gtk.STOCK_ADD, Gtk.ResponseType.OK))
-        dn_dialog.set_default_response(Gtk.ResponseType.OK)
-        dn_entry = Gtk.Entry()
-        dn_entry.set_text(str(dn))
-        dn_dialog.vbox.add(dn_entry)
-        dn_dialog.set_title(_("Enter DN:"))
-        dn_dialog.show_all()
-        
-        if dn_dialog.run() == Gtk.ResponseType.OK:
-            dn = dn_entry.get_text()
-            try:
-                msg = ldb.Message(ldb.Dn(self.ldb, dn))
-                # (Until recently) LDB fails when the msg has no attributes
-                # so add a default "name" attribute.
-                name = dn.split(",")[0]
-                name = name[3:] # Chop off dn=, etc. 
-                msg["name"] = name
-                self.ldb.add(msg)
-            except (ldb.LdbError, ValueError), err:
-                self.infobar.display_message(err)
-            else:
-                self.fill_tree()
-        dn_dialog.destroy()
-    
-    def delete_dn_cb(self, button):
-        self.delete_dn(self.get_selected_dn())
-    
-    def delete_dn(self, dn):
-        try:
-            print dn
-            self.ldb.delete(ldb.Dn(self.ldb, str(dn)))
-        except (ldb.LdbError, ValueError), err:
-            self.infobar.display_message(err)
-        self.fill_tree()
-        self.cur_selected_dn = None
-        self.refresh_attributes()
-        
-    def get_text(self, dn):
-        try:
-            msg = self.ldb.search(self.cur_selected_dn, ldb.SCOPE_BASE)[0]
-        except IndexError:
-            self.infobar.show_message(_("Failed to load record '%s'.")
-                                        % self.cur_selected_dn)
-            return None # It's empty, ignore
-        except ldb.LdbError, err:
-            self.ldb_error_exception(err)
-            return None
-        return self.ldb.write_ldif(msg, ldb.CHANGETYPE_MODIFY)
-    
-    def export_ldif_cb(self, button):
-        self.export_ldif(self.get_selected_dn())
-    
-    def export_ldif(self, dn):
-        dialog = Gtk.FileChooserDialog(title=_("Save LDIF"),
-                        action=Gtk.FileChooserAction.SAVE,
-                        parent=self,
-                        buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
-        if dialog.run() == Gtk.ResponseType.OK:
-            with open(dialog.get_filename(), 'w') as f:
-                f.write(self.get_text(dn))
-        dialog.destroy()
-    
-    def edit_ldif_cb(self, button):
-        self.edit_ldif(self.get_selected_dn())
-    
-    def edit_ldif(self, dn):
-        from tempfile import mkstemp
-        
-        dialog = EditorDialog(parent=self,
-                    buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                            Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
-        dialog.set_text(self.get_text(dn))
-        if dialog.run() == Gtk.ResponseType.OK:
-            # Delete existing record...
-            try:
-                self.ldb.delete(ldb.Dn(self.ldb, str(dn)))
-            except (ldb.LdbError, ValueError), err:
-                self.infobar.display_message(err, Gtk.MessageType.WARNING)
-            
-            # And insert updated record
-            try:
-                for __, msg in self.ldb.parse_ldif(dialog.get_text()):
-                    print msg
-                    self.ldb.add(msg)
-            except (ldb.LdbError, ValueError), err:
-                self.infobar.display_message(err)
-                
-            # Then reload trees
-            self.fill_tree()
-            self.refresh_attributes()
-        dialog.destroy()
-        
-    def cb_dn_button_press(self, treeview, event):
-        """Show right click popup menu to add or delete an element."""
-        # This event handler depends on self.ldb
-        if self.ldb is None: return
-        
-        if event.button == 3:
-            x = int(event.x)
-            y = int(event.y)
-            time = event.time
-            pthinfo = treeview.get_path_at_pos(x, y)
-            
-            popup = Gtk.Menu()
-            popup.attach_to_widget(treeview)
-            if pthinfo is not None:
-                path, col, cellx, celly = pthinfo
-                path_str = ":".join(map(str, path))
-                iter = self.treemodel.get_iter_from_string(path_str)
-                
-                treeview.grab_focus()
-                treeview.set_cursor(path, col, 0)
-                
-                dn = self.treemodel[iter][1]
-                
-                # Now create the menu for items
-                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD)
-                el.connect('activate', lambda x: self.add_dn(dn))
-                popup.add(el)
-                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_DELETE)
-                el.connect('activate', lambda x: self.delete_dn(dn))
-                popup.add(el)
-                el = Gtk.MenuItem.new_with_mnemonic(_("E_xport LDIF"))
-                el.connect('activate', lambda x: self.export_ldif(dn))
-                popup.add(el)
-                el = Gtk.MenuItem.new_with_mnemonic(_("_Edit LDIF"))
-                el.connect('activate', lambda x: self.edit_ldif(dn))
-                popup.add(el)
-            else:
-                # Create the menu for the sidebar
-                el = Gtk.ImageMenuItem.new_from_stock(Gtk.STOCK_ADD)
-                el.connect('activate', lambda x: self.add_dn(""))
-                popup.add(el)
-            popup.show_all()
-            popup.popup(None, None, None, None, event.button, time)
-            return True
-  
-    def cb_dn_cell_edited(self, renderer, path_string, new_rdn):
-        """Rename an element"""
-        iter = self.treemodel.get_iter_from_string(path_string)
-        
-        old_dn = self.treemodel[iter][1]
-        old_rdn = get_rdn(str(old_dn))
-        
-        if old_rdn == new_rdn: return
-        
-        parent_iter = self.treemodel.iter_parent(iter.copy())
-        if parent_iter:
-            parent_dn = self.treemodel.get(parent_iter, LdbTree.PATH)[0]
-            new_dn = new_rdn + "," + parent_dn
-        
-        try:
-            self.ldb.rename(ldb.Dn(self.ldb, str(old_dn)), new_dn)
-        except ldb.LdbError, err:
-            self.ldb_error_exception(err)
-            return
-        
-        self.fill_tree()
-    # END DN EDITTING
+        self.dn_tree.toggle_special_entries(not item.get_active())
         
     def cb_dn_cursor_changed(self, item):
         """Change currently selected dn and refresh attributes"""
-        (model, iter) = item.get_selection().get_selected()
-        if iter == None:
-            self.cur_selected_dn = None
-            
-            # Update toolbar
-            self.set_dn_toolbar_sensitive(False)
-            self.treeview_add_item.set_sensitive(True)
-        else:
-            self.cur_selected_dn = model.get_value(iter, 1)
-            
-            self.set_dn_toolbar_sensitive(True) # Update toolbar
+        self.cur_selected_dn = item
         self.refresh_attributes()
         
     # START ATTRIBUTE EDITTING

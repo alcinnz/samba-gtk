@@ -4,12 +4,21 @@ from distutils.core import setup, Command
 from distutils.command.build import build
 from distutils.command.sdist import sdist
 from distutils.command.install import install
-import os, subprocess
+import os, subprocess, filecmp
 
 if not os.path.exists('/usr/share/applications'):
     print ("WARNING! You do not appear to be running a freedesktop.org"
             " compliant desktop.")
     print "This install may not work and an alternative may need to be provided."
+
+# update-mime-database takes a bit to run as it loads all known MIMEtypes
+# into memory before writing out the indexing files.
+
+# As such avoid calling it.
+mimes_changed = (os.path.exists('/usr/share/mime/packages/sambagtk.xml') and
+                os.path.exists('mime/sambagtk.xml') and
+                not filecmp.cmp('/usr/share/mime/packages/sambagtk.xml',
+                            'mime/sambagtk.xml', shallow=False))
 
 class BuildManpages(Command):
     description = "Create manual pages"
@@ -84,7 +93,7 @@ def has_xsltproc(cmd):
     return os.path.exists("/usr/bin/xsltproc")
 
 def has_update_mime_database(cmd):
-    return os.path.exists("/usr/bin/update-mime-database")
+    return os.path.exists("/usr/bin/update-mime-database") and mimes_changed
 
 def has_update_desktop_database(cmd):
     return os.path.exists("/usr/bin/update-desktop-database")

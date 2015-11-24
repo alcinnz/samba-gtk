@@ -4,7 +4,7 @@
         <comment xml:lang="en">LDB database</comment>
         
         <!-- NOTE: This icon is non-standard, but it's better than nothing. -->
-        <generic-icon name="office-database" />
+        <generic-icon name="office-database"/>
         <glob pattern="*.ldb"/>
     </mime-type>
 </mime-info>
