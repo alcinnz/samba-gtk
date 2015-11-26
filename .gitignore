@@ -7,9 +7,6 @@ configure
 tags
 libsamba-gtk.so.*
 gtksamba.pc
-gwcrontab
-gwsam
-gwsvcctl
 Makefile.settings
 config.status
 *.pyc
