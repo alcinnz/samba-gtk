@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Windows Share Manager
+Comment=Manager fileshares on a remote Windows machine
+Exec=gwshare
+Icon=samba-gwshare
+Type=Application
+Terminal=false
+Categories=GNOME;GTK;RemoteAccess;System;Utility;Network
+StartupNotify=true

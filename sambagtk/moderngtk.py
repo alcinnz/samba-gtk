@@ -3,7 +3,7 @@ Helps Samba-GTK applications with modern GTK3 widgets
 like the Headerbar and Infobars. 
 """
 from gi.repository import Gtk
-import os
+import os, sys
 
 def build_toolbar(window, vbox):
     """Creates a headerbar or toolbar appropriately for a window."""
@@ -54,3 +54,11 @@ def build_inline_toolbar():
     toolbar.set_icon_size(Gtk.IconSize.SMALL_TOOLBAR)
     
     return toolbar
+
+def get_resource(filename):
+    filepath = os.path.join(sys.path[0], '..', 'res', filename)
+    if os.path.exists(filepath):
+        return filepath
+    # This is the install path for the media
+    filepath = '/usr/share/samba-gtk/'+filename
+    return filepath

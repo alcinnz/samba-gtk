@@ -1,9 +1,9 @@
 [Desktop Entry]
 Name=Registry Editor
 Comment=Edit Windows-Style Registry files
-Exec=gregedit
-Icon=samba
+Exec=gwregedit
+Icon=samba-registry
 Terminal=false
 Type=Application
-Categories=GNOME;GTK;RemoteAccess;Utility;Network;
+Categories=GNOME;GTK;RemoteAccess;Utility;Network;Database;
 StartupNotify=true

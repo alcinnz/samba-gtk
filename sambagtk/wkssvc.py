@@ -24,6 +24,8 @@
 
 from sambagtk.dialogs import ConnectDialog
 
+from gi.repository import Gtk
+
 """ wkssvc related dialogues"""
 
 

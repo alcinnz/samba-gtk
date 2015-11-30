@@ -2,7 +2,7 @@
 Name=Windows User Manager
 Comment=Manage user, group and aliases on a remote Windows machine
 Exec=gwsam
-Icon=samba
+Icon=samba-gwsam
 Type=Application
 Terminal=false
 Categories=GNOME;GTK;RemoteAccess;System;Utility;Network;

@@ -22,10 +22,14 @@ from gi.repository import GdkPixbuf
 import samba
 import os
 import sys
+
+from moderngtk import get_resource
+
 class AboutDialog(Gtk.AboutDialog):
 
-    def __init__(self, name, description, icon):
+    def __init__(self, name, description, icon=None):
         super(AboutDialog, self).__init__()
+        self.set_icon_name('help-about')
 
         license_text = \
 """
@@ -49,18 +53,21 @@ along with this program. If not, see <http://www.gnu.org/licenses/>."""
                     "Adrian Cochrane <adrianc@catalyst.net.nz>"]
         copyright_text = "Copyright \xc2\xa9 2012 Dhananjay Sathe <dhananjaysathe@gmail.com>"
 
+        print bool(icon)
+        if icon:
+            theme = Gtk.IconTheme.get_default()
+            logo = theme.load_icon(icon, Gtk.IconSize.DIALOG, 0)
+        else:
+            filepath = get_resource('samba-logo-small.png')
+            logo = GdkPixbuf.Pixbuf.new_from_file(filepath)
         self.set_property("program-name",name)
-        self.set_property("logo",icon)
+        self.set_property("logo",logo)
         self.set_property("version",samba.version)
         self.set_property("comments",description)
         self.set_property("wrap_license",True)
         self.set_property("license",license_text)
         self.set_property("authors",authors)
         self.set_property("copyright",copyright_text)
-        if not self.get_logo():
-            default_logo_file = get_default_logo()
-            icon_pixbuf = GdkPixbuf.Pixbuf.new_from_file(default_logo_file)
-            self.set_logo(icon_pixbuf)
 
 
 class ConnectDialog(Gtk.Dialog):
@@ -97,7 +104,7 @@ class ConnectDialog(Gtk.Dialog):
 
         self.artwork = Gtk.VBox()
 
-        self.samba_image_filename = get_default_logo()
+        self.samba_image_filename = get_resource('samba-logo-small.png')
         self.samba_image = Gtk.Image()
         self.samba_image.set_from_file(self.samba_image_filename)
         self.artwork.pack_start(self.samba_image, True, True, 0)
@@ -247,12 +254,3 @@ class ConnectDialog(Gtk.Dialog):
 
     def on_radio_button_toggled(self, widget):
         self.update_sensitivity()
-
-def get_default_logo(name="samba-logo-small"):
-    filepath = os.path.join(sys.path[0], '..', 'logos', name+".png")
-    if os.path.exists(filepath):
-        return filepath
-    # This is the install path for the media
-    filepath = '/usr/share/samba-gtk/'+name+'.png'
-    print (filepath)
-    return filepath

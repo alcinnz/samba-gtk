@@ -6,13 +6,11 @@ import traceback
 import threading
 import time
 import getopt
+import gettext
+gettext.install('gwsvcctl')
 
-from gi.repository import GObject
-from gi.repository import Gtk
-from gi.repository import Gdk
-from gi.repository import GLib
-from gi.repository import GdkPixbuf
-from gi.repository import Pango
+from gi.repository import GObject, Gtk, Gdk
+from gi.repository import GLib, GdkPixbuf, Pango
 
 from samba import credentials
 from samba.dcerpc import svcctl
@@ -27,7 +25,7 @@ from sambagtk.svcctl import (
     ServiceEditDialog,
     ServiceControlDialog,
     )
-
+from sambagtk.moderngtk import build_toolbar, build_inline_toolbar
 
 class SvcCtlPipeManager(object):
 
@@ -64,14 +62,17 @@ class SvcCtlPipeManager(object):
         pass # apparently there's no .Close() method for this pipe
 
     def fetch_services(self, svcctl_window):
-        """Fetches a list of services from the server. svcctl_window is used to update the GUI."""
-        # Note: this function is designed to be called by a secondary thread only.
+        """Fetches a list of services from the server.
+            svcctl_window is used to update the GUI."""
+        # Note: this function is designed to be called
+        #       by a secondary thread only.
         # If the main thread calls this then THERE WILL BE A DEADLOCK!
         del self.service_list[:]
 
-        (buffer, needed, count, resume_handle) = self.pipe.EnumServicesStatusW(
+        buffer, needed, count, resume_handle = self.pipe.EnumServicesStatusW(
             self.scm_handle,
-            svcctl.SERVICE_TYPE_WIN32_OWN_PROCESS | svcctl.SERVICE_TYPE_WIN32_SHARE_PROCESS,
+            svcctl.SERVICE_TYPE_WIN32_OWN_PROCESS | 
+                svcctl.SERVICE_TYPE_WIN32_SHARE_PROCESS,
             svcctl.SERVICE_STATE_ALL, 256 * 1024,
             0)
 
@@ -81,11 +82,13 @@ class SvcCtlPipeManager(object):
         svcctl_window.progressbar.show()
         Gdk.threads_leave()
 
-        for enum_service_status in SvcCtlPipeManager.enum_service_status_list_from_buffer(buffer, count):
+        for enum_service_status in (
+                SvcCtlPipeManager.enum_service_status_list_from_buffer(buffer,
+                                                                        count)):
             try:
                 Gdk.threads_enter()
-                svcctl_window.set_status("Fetching service: %s."
-                                         % (enum_service_status.service_name))
+                svcctl_window.set_status(_("Fetching service: %s")
+                                         % enum_service_status.service_name)
                 svcctl_window.progressbar.set_fraction(current / count)
                 Gdk.threads_leave()
                 current += 1.0
@@ -94,10 +97,13 @@ class SvcCtlPipeManager(object):
                 self.service_list.append(service)
             except RuntimeError as re:
                 if re.args[0] == 5: #5 is WERR_ACCESS_DENIED
-                    print "Failed to fetch service \'%s\': Access Denied." % (enum_service_status.service_name)
+                    print "Failed to fetch service '%s': Access Denied." % (
+                            enum_service_status.service_name)
                 else:
-                    #we do this so we can continue fetching services, even if a few fetches fail.
-                    print "Failed to fetch service %s: %s." % (enum_service_status.service_name, re.args[1])
+                    # We do this so we can continue fetching services,
+                    # even if a few fetches fail.
+                    print "Failed to fetch service %s: %s." % (
+                                enum_service_status.service_name, re.args[1])
                     traceback.print_exc()
 
         Gdk.threads_enter()
@@ -114,18 +120,19 @@ class SvcCtlPipeManager(object):
         (service_config, needed) = self.pipe.QueryServiceConfigW(
             service.handle, 8192)
         # TODO: this gives a "DCERPC Fault NDR" error
-        #TODO: this gives me a "NT_STATUS_RPC_BAD_STUB_DATA" error
+        # TODO: this gives me a "NT_STATUS_RPC_BAD_STUB_DATA" error
         self.pipe.ChangeServiceConfigW(
-            service.handle,                      #policy_handle *handle
-            service_config.service_type,                #uint32 type
-            service.start_type,               #svcctl_StartType start_type
-            service_config.error_control,  #svcctl_ErrorControl error_control
-            unicode(service.path_to_exe),               #uint16 *binary_path
-            unicode(service_config.loadordergroup),     #uint16 *load_order_group
-            unicode(service_config.dependencies),       #uint16 *dependencies
-            unicode(service.account),                   #uint16 *service_start_name
-            unicode(service.account_password),          #uint16 *password
-            unicode(service.display_name))              #uint16 *display_name
+            service.handle,                         #policy_handle *handle
+            service_config.service_type,            #uint32 type
+            service.start_type,                     #svcctl_StartType start_type
+            #svcctl_ErrorControl error_control
+            service_config.error_control,
+            unicode(service.path_to_exe),           #uint16 *binary_path
+            unicode(service_config.loadordergroup), #uint16 *load_order_group
+            unicode(service_config.dependencies),   #uint16 *dependencies
+            unicode(service.account),               #uint16 *service_start_name
+            unicode(service.account_password),      #uint16 *password
+            unicode(service.display_name))          #uint16 *display_name
 
         service_status = self.pipe.QueryServiceStatus(service.handle)
 
@@ -170,8 +177,7 @@ class SvcCtlPipeManager(object):
 
         (service_config2_buffer, needed) = self.pipe.QueryServiceConfig2W(
                     service.handle, svcctl.SERVICE_CONFIG_DESCRIPTION, 8192)
-        service_description = \
-                SvcCtlPipeManager.service_description_from_buffer(
+        service_description = SvcCtlPipeManager.service_description_from_buffer(
                                                     service_config2_buffer)
         service.description = service_description.description.strip()
 
@@ -286,7 +292,8 @@ class FetchServicesThread(threading.Thread):
     def run(self):
         self.pipe_manager.lock.acquire()
         try:
-            #This function handles runtime errors on it's own. This way it can continue running after an error.
+            #This function handles runtime errors on it's own.
+            # This way it can continue running after an error.
             self.pipe_manager.fetch_services(self.svcctl_window)
         finally:
             self.pipe_manager.lock.release()
@@ -320,14 +327,14 @@ class ServiceControlThread(threading.Thread):
     def run(self):
         self.running = True
 
-        control_string = { None: "start",
-                           svcctl.SVCCTL_CONTROL_STOP: "stop",
-                           svcctl.SVCCTL_CONTROL_PAUSE: "pause",
-                           svcctl.SVCCTL_CONTROL_CONTINUE: "resume"}
-        control_string2 = { None: "started",
-                            svcctl.SVCCTL_CONTROL_STOP: "stopped",
-                            svcctl.SVCCTL_CONTROL_PAUSE: "paused",
-                            svcctl.SVCCTL_CONTROL_CONTINUE: "resumed"}
+        control_string = { None: _("start"),
+                           svcctl.SVCCTL_CONTROL_STOP: _("stop"),
+                           svcctl.SVCCTL_CONTROL_PAUSE: _("pause"),
+                           svcctl.SVCCTL_CONTROL_CONTINUE: _("resume")}
+        control_string2 = { None: _("started"),
+                            svcctl.SVCCTL_CONTROL_STOP: _("stopped"),
+                            svcctl.SVCCTL_CONTROL_PAUSE: _("paused"),
+                            svcctl.SVCCTL_CONTROL_CONTINUE: _("resumed")}
         final_state = { None: svcctl.SVCCTL_RUNNING,
                         svcctl.SVCCTL_CONTROL_STOP: svcctl.SVCCTL_STOPPED,
                         svcctl.SVCCTL_CONTROL_PAUSE: svcctl.SVCCTL_PAUSED,
@@ -350,7 +357,7 @@ class ServiceControlThread(threading.Thread):
                             ((self.service.wait_hint / 1000.0) / sleep_delay))
 
         except RuntimeError, re:
-            msg = "Failed to %s service \'%s\': %s." % (
+            msg = _("Failed to %s service '%s': %s") % (
                                                 control_string[self.control],
                                                 self.service.display_name,
                                                 re.args[1])
@@ -364,11 +371,10 @@ class ServiceControlThread(threading.Thread):
                           Gtk.ButtonsType.OK, msg, self.service_control_dialog)
             Gdk.threads_leave()
 
-
             return
 
         except Exception, ex:
-            msg = "Failed to %s service \'%s\': %s." % (
+            msg = _("Failed to %s service '%s': %s") % (
                                         control_string[self.control],
                                         self.service.display_name, str(ex))
             print msg
@@ -392,7 +398,7 @@ class ServiceControlThread(threading.Thread):
                 self.pipe_manager.fetch_service_status(self.service)
 
             except RuntimeError, re:
-                msg = "Failed to %s service \'%s\': %s." % (
+                msg = _("Failed to %s service '%s': %s") % (
                                         control_string[self.control],
                                         self.service.display_name, str(ex))
                 print msg
@@ -408,7 +414,7 @@ class ServiceControlThread(threading.Thread):
                 return
 
             except Exception, ex:
-                msg = "Failed to %s service \'%s\': %s." % (
+                msg = _("Failed to %s service '%s': %s") % (
                                         control_string[self.control],
                                         self.service.display_name, str(ex))
                 print msg
@@ -429,7 +435,8 @@ class ServiceControlThread(threading.Thread):
             if (self.service.state != svcctl.SVCCTL_START_PENDING and
                 self.service.state != svcctl.SVCCTL_STOP_PENDING and
                 self.service.state != svcctl.SVCCTL_PAUSE_PENDING and
-                self.service.state != svcctl.SVCCTL_CONTINUE_PENDING): # no pending operation => done
+                # no pending operation => done
+                self.service.state != svcctl.SVCCTL_CONTINUE_PENDING):
 
                 self.running = False
                 Gdk.threads_enter()
@@ -448,15 +455,15 @@ class ServiceControlThread(threading.Thread):
         self.svcctl_window.refresh_services_tree_view()
 
         if (self.service.state == final_state[self.control]):
-            self.svcctl_window.set_status("Successfully %s \'%s\' service." % (
+            self.svcctl_window.set_status(_("Successfully %s '%s' service") % (
                      control_string2[self.control], self.service.display_name))
         else:
             if (self.pending):
                 self.svcctl_window.set_status(
-                "The %s operation on the \'%s\' service is still pending." % (
+                _("The %s operation on the '%s' service is still pending") % (
                       control_string[self.control], self.service.display_name))
             else:
-                msg = "Failed to %s the \'%s\' service." % (
+                msg = _("Failed to %s the '%s' service") % (
                        control_string[self.control], self.service.display_name)
                 self.svcctl_window.set_status(msg)
                 self.svcctl_window.run_message_dialog(Gtk.MessageType.ERROR,
@@ -480,7 +487,7 @@ class SvcCtlWindow(Gtk.Window):
         self.pipe_manager = None
         self.update_sensitivity()
         self.update_captions()
-        self.set_status("Disconnected.")
+        self.set_status(_("Disconnected"))
 
         # It's nice to have this info saved when a user wants to reconnect
         self.server_address = server
@@ -500,139 +507,40 @@ class SvcCtlWindow(Gtk.Window):
     def create(self):
 
         # main window
-
-        accel_group = Gtk.AccelGroup()
-
-        self.set_title("Service Control Management")
+        self.set_title(_("Service Control Management"))
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], "images", "service.png")
-        self.icon_pixbuf = GdkPixbuf.Pixbuf.new_from_file(self.icon_filename)
-        self.set_icon(self.icon_pixbuf)
 
         vbox = Gtk.VBox(False, 0)
         self.add(vbox)
 
-        # menu
-        self.menubar = Gtk.MenuBar()
-        vbox.pack_start(self.menubar, False, False, 0)
-
-        self.file_item = Gtk.MenuItem.new_with_mnemonic("_File")
-        self.menubar.add(self.file_item)
-
-        file_menu = Gtk.Menu()
-        self.file_item.set_submenu(file_menu)
-
-        self.connect_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_CONNECT, accel_group)
-        self.connect_item.set_always_show_image(True)
-        file_menu.add(self.connect_item)
-
-        self.disconnect_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_DISCONNECT, accel_group)
-        self.disconnect_item.set_sensitive(False)
-        self.disconnect_item.set_always_show_image(True)
-        file_menu.add(self.disconnect_item)
-
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        menu_separator_item.set_property("sensitive",False)
-        file_menu.add(menu_separator_item)
-
-        self.quit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_QUIT, accel_group)
-        self.quit_item.set_always_show_image(True)
-        file_menu.add(self.quit_item)
-
-        self.view_item = Gtk.MenuItem.new_with_mnemonic('_View')
-        self.menubar.add(self.view_item)
-
-        view_menu = Gtk.Menu()
-        self.view_item.set_property("submenu",view_menu)
-
-        self.refresh_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_REFRESH, accel_group)
-        self.refresh_item.set_sensitive(False)
-        self.refresh_item.set_always_show_image(True)
-        view_menu.add(self.refresh_item)
-
-        self.service_item = Gtk.MenuItem.new_with_mnemonic('_Service')
-        self.menubar.add(self.service_item)
-
-        service_menu = Gtk.Menu()
-        self.service_item.set_submenu(service_menu)
-
-        self.start_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_MEDIA_PLAY, accel_group)
-        self.start_item.get_child().set_text("Start")
-        self.start_item.set_always_show_image(True)
-        service_menu.add(self.start_item)
-
-        self.stop_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_MEDIA_STOP, accel_group)
-        self.stop_item.get_child().set_text("Stop")
-        self.stop_item.set_always_show_image(True)
-        service_menu.add(self.stop_item)
-
-        self.pause_resume_item = Gtk.ImageMenuItem.new_from_stock(
-                                            Gtk.STOCK_MEDIA_PAUSE, accel_group)
-        self.pause_resume_item.set_always_show_image(True)
-        service_menu.add(self.pause_resume_item)
-
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        service_menu.add(menu_separator_item)
-
-        self.properties_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_PROPERTIES, accel_group)
-        self.properties_item.set_always_show_image(True)
-        service_menu.add(self.properties_item)
-
-        self.help_item = Gtk.MenuItem("_Help")
-        self.menubar.add(self.help_item)
-
-        help_menu = Gtk.Menu()
-        self.help_item.set_submenu(help_menu)
-
-        self.about_item = Gtk.ImageMenuItem.new_from_stock(
-                                                  Gtk.STOCK_ABOUT, accel_group)
-        self.about_item.set_always_show_image(True)
-        help_menu.add(self.about_item)
-
         # toolbar
-        self.toolbar = Gtk.Toolbar()
-        vbox.pack_start(self.toolbar, False, False, 0)
+        self.toolbar = build_toolbar(self, vbox)
 
         self.connect_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
-        self.connect_button.set_is_important(True)
-        self.connect_button.set_tooltip_text("Connect to a server")
-        self.toolbar.insert(self.connect_button, 0)
+        self.connect_button.set_tooltip_text(_("Connect to a server"))
+        self.toolbar.add(self.connect_button)
 
         self.disconnect_button = Gtk.ToolButton.new_from_stock(
                                                          Gtk.STOCK_DISCONNECT)
-        self.disconnect_button.set_is_important(True)
-        self.disconnect_button.set_tooltip_text("Disconnect from the server")
-        self.toolbar.insert(self.disconnect_button, 1)
+        self.disconnect_button.set_tooltip_text(_("Disconnect from the server"))
+        self.toolbar.add(self.disconnect_button)
 
-        self.toolbar.insert(Gtk.SeparatorToolItem(), 2)
+        self.refresh_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_REFRESH)
+        self.refresh_button.set_tooltip_text(_("Reload data from server"))
+        self.toolbar.add(self.refresh_button)
 
-        self.start_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_MEDIA_PLAY)
-        self.start_button.set_label("Start")
-        self.start_button.set_tooltip_text("Start the service")
-        self.start_button.set_is_important(True)
-        self.toolbar.insert(self.start_button, 3)
-
-        self.stop_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_MEDIA_STOP)
-        self.stop_button.set_label("Stop")
-        self.stop_button.set_tooltip_text("Stop the service")
-        self.stop_button.set_is_important(True)
-        self.toolbar.insert(self.stop_button, 4)
-
-        self.pause_resume_button = Gtk.ToolButton.new_from_stock(
-                                                        Gtk.STOCK_MEDIA_PAUSE)
-        self.pause_resume_button.set_is_important(True)
-        self.toolbar.insert(self.pause_resume_button, 5)
+        self.toolbar.add(Gtk.SeparatorToolItem())
+        
+        self.about_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
+        self.about_button.set_tooltip_text(_("About GWSvcCtl..."))
+        if hasattr(self.toolbar, 'pack_end'):
+            self.toolbar.pack_end(self.about_button)
+        else:
+            self.toolbar.add(self.about_button)
 
         # services list
         self.scrolledwindow = Gtk.ScrolledWindow(None, None)
-        self.scrolledwindow.set_property("shadow_type",Gtk.ShadowType.IN)
+        self.scrolledwindow.set_property('shadow_type',Gtk.ShadowType.IN)
         vbox.pack_start(self.scrolledwindow, True, True, 0)
 
         self.services_tree_view = Gtk.TreeView()
@@ -642,54 +550,52 @@ class SvcCtlWindow(Gtk.Window):
         column.set_title("")
         column.set_resizable(False)
         renderer = Gtk.CellRendererPixbuf()
-        renderer.set_property("pixbuf",
-                               GdkPixbuf.Pixbuf.new_from_file_at_size(
-                               self.icon_filename, 22, 22))
+        renderer.set_property('icon-name', 'application-x-executable')
         column.pack_start(renderer, True)
         self.services_tree_view.append_column(column)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Name")
+        column.set_title(_("Name"))
         column.set_resizable(True)
         column.set_fixed_width(80)
         column.set_expand(True)
         column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         column.set_sort_column_id(1)
         renderer = Gtk.CellRendererText()
-        renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
         column.pack_start(renderer, True)
         self.services_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 1)
+        column.add_attribute(renderer, 'text', 1)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Description")
+        column.set_title(_("Description"))
         column.set_resizable(True)
         column.set_expand(True)
         column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
         column.set_sort_column_id(2)
         renderer = Gtk.CellRendererText()
-        renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
+        renderer.set_property('ellipsize', Pango.EllipsizeMode.END)
         column.pack_start(renderer, True)
         self.services_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 2)
+        column.add_attribute(renderer, 'text', 2)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("State")
+        column.set_title(_("State"))
         column.set_resizable(True)
         column.set_sort_column_id(3)
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
         self.services_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 3)
+        column.add_attribute(renderer, 'text', 3)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Start Type")
+        column.set_title(_("Start Type"))
         column.set_resizable(True)
         column.set_sort_column_id(4)
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
         self.services_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 4)
+        column.add_attribute(renderer, 'text', 4)
 
         self.services_store = Gtk.ListStore(GObject.TYPE_STRING,
                                             GObject.TYPE_STRING,
@@ -698,6 +604,33 @@ class SvcCtlWindow(Gtk.Window):
                                             GObject.TYPE_STRING)
         self.services_store.set_sort_column_id(1, Gtk.SortType.ASCENDING)
         self.services_tree_view.set_model(self.services_store)
+
+        # inline toolbar
+        inline_toolbar = build_inline_toolbar()
+        vbox.pack_start(inline_toolbar, expand=False, fill=False, padding=0)
+
+        self.start_button = Gtk.ToolButton.new(None, _("Start Service"))
+        self.start_button.set_icon_name('system-run-symbolic')
+        self.start_button.set_label(_("Start"))
+        self.start_button.set_tooltip_text(_("Start the service"))
+        inline_toolbar.add(self.start_button)
+
+        self.stop_button = Gtk.ToolButton.new(None, _("Stop Service"))
+        self.stop_button.set_icon_name('media-playback-stop-symbolic')
+        self.stop_button.set_tooltip_text(_("Stop the selected service"))
+        inline_toolbar.add(self.stop_button)
+
+        self.pause_resume_button = Gtk.ToolButton.new(None, _("Pause Service"))
+        inline_toolbar.add(self.pause_resume_button)
+
+        inline_toolbar.add(Gtk.SeparatorToolItem())
+
+        self.properties_button = Gtk.ToolButton.new(None,
+                                    _("Service Properties"))
+        self.properties_button.set_icon_name('document-properties-symbolic')
+        self.properties_button.set_tooltip_text(
+                                    _("View properties for selected service"))
+        inline_toolbar.add(self.properties_button)
 
         # status bar & progress bar
 
@@ -715,38 +648,26 @@ class SvcCtlWindow(Gtk.Window):
 
         # signals/events
 
-        self.connect("delete_event", self.on_self_delete)
-        self.connect("key-press-event", self.on_key_press)
+        self.connect('delete_event', self.on_self_delete)
+        self.connect('key-press-event', self.on_key_press)
 
-        self.connect_item.connect("activate", self.on_connect_item_activate)
-        self.disconnect_item.connect("activate",
+        self.connect_button.connect('clicked', self.on_connect_item_activate)
+        self.disconnect_button.connect('clicked',
                                             self.on_disconnect_item_activate)
-        self.quit_item.connect("activate", self.on_quit_item_activate)
-        self.refresh_item.connect("activate", self.on_refresh_item_activate)
-        self.start_item.connect("activate", self.on_start_item_activate)
-        self.stop_item.connect("activate", self.on_stop_item_activate)
-        self.pause_resume_item.connect("activate",
-                                        self.on_pause_resume_item_activate)
-        self.properties_item.connect("activate",
-                                            self.on_properties_item_activate)
-        self.about_item.connect("activate", self.on_about_item_activate)
-
-        self.connect_button.connect("clicked", self.on_connect_item_activate)
-        self.disconnect_button.connect("clicked",
-                                            self.on_disconnect_item_activate)
-        self.start_button.connect("clicked", self.on_start_item_activate)
-        self.stop_button.connect("clicked", self.on_stop_item_activate)
-        self.pause_resume_button.connect("clicked",
+        self.refresh_button.connect('clicked', self.on_refresh_item_activate)
+        self.start_button.connect('clicked', self.on_start_item_activate)
+        self.stop_button.connect('clicked', self.on_stop_item_activate)
+        self.pause_resume_button.connect('clicked',
                                             self.on_pause_resume_item_activate)
+        self.properties_button.connect('clicked', self.on_properties_item_activate)
+        self.about_button.connect('clicked', self.on_about_item_activate)
 
-        self.services_tree_view.get_selection().connect("changed",
+        self.services_tree_view.get_selection().connect('changed',
                                                     self.on_update_sensitivity)
-        self.services_tree_view.get_selection().connect("changed",
+        self.services_tree_view.get_selection().connect('changed',
                                                       self.on_update_captions)
-        self.services_tree_view.connect("button_press_event",
+        self.services_tree_view.connect('button_press_event',
                                       self.on_services_tree_view_button_press)
-
-        self.add_accel_group(accel_group)
 
 
     def refresh_services_tree_view(self):
@@ -777,7 +698,9 @@ class SvcCtlWindow(Gtk.Window):
             name = model.get_value(iter, 0)
 
             self.pipe_manager.lock.acquire()
-            service_list = [service for service in self.pipe_manager.service_list if service.name == name]
+            service_list = [service
+                            for service in self.pipe_manager.service_list
+                            if service.name == name]
             self.pipe_manager.lock.release()
 
             if (len(service_list) == 0):
@@ -805,25 +728,16 @@ class SvcCtlWindow(Gtk.Window):
         else:
             selected = False
 
-        self.connect_item.set_sensitive(not connected)
-        self.disconnect_item.set_sensitive(connected)
-        self.refresh_item.set_sensitive(connected)
-        self.start_item.set_sensitive(connected and selected and
-                                        stopped and startable)
-        self.stop_item.set_sensitive(connected and selected and
-                                       running and stoppable)
-        self.pause_resume_item.set_sensitive(connected and selected and
-                                            pausable and (running or paused))
-        self.properties_item.set_sensitive(connected and selected)
-
         self.connect_button.set_sensitive(not connected)
         self.disconnect_button.set_sensitive(connected)
+        self.refresh_button.set_sensitive(connected)
         self.start_button.set_sensitive(connected and selected and
                                           stopped and startable)
         self.stop_button.set_sensitive(connected and selected and
                                          running and stoppable)
         self.pause_resume_button.set_sensitive(connected and selected and
                                               pausable and (running or paused))
+        self.properties_button.set_sensitive(connected and selected)
 
     def update_captions(self):
         service = self.get_selected_service()
@@ -832,11 +746,11 @@ class SvcCtlWindow(Gtk.Window):
         else:
             paused = (service.state == svcctl.SVCCTL_PAUSED)
 
-        self.pause_resume_item.get_child().set_text([
-                                                    "Pause", "Resume"][paused])
         self.pause_resume_button.set_tooltip_text([
-                            "Pause the service", "Resume the service"][paused])
-        self.pause_resume_button.set_label(["Pause", "Resume"][paused])
+                    _("Pause the service"), _("Resume the service")][paused])
+        self.pause_resume_button.set_label([_("Pause"), _("Resume")][paused])
+        self.pause_resume_button.set_icon_name('media-playback-'+
+                    ['start', 'pause'][paused]+'-symbolic')
 
     def run_message_dialog(self, type, buttons, message, parent=None):
         if parent is None:
@@ -922,46 +836,53 @@ class SvcCtlWindow(Gtk.Window):
                     break
 
                 except RuntimeError, re:
-                    if re.args[1] == 'Logon failure': #user got the password wrong
+                    #user got the password wrong
+                    if re.args[1] == 'Logon failure':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
-                            Gtk.ButtonsType.OK,
-                            "Failed to connect: Invalid username or password.",
-                            dialog)
+                                Gtk.ButtonsType.OK,
+                                _("Failed to connect: "
+                                "Invalid username or password"),
+                                dialog)
                         dialog.password_entry.grab_focus()
-                        dialog.password_entry.select_region(0, -1) #select all the text in the password box
+                        #select all the text in the password box
+                        dialog.password_entry.select_region(0, -1)
                     elif re.args[0] == 5 or re.args[1] == 'Access denied':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
-                                    Gtk.ButtonsType.OK,
-                                    "Failed to connect: Access Denied.",
-                                    dialog)
+                                Gtk.ButtonsType.OK,
+                                _("Failed to connect: Access Denied"),
+                                dialog)
                         dialog.username_entry.grab_focus()
                         dialog.username_entry.select_region(0, -1)
                     elif re.args[1] == 'NT_STATUS_HOST_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
-                             Gtk.ButtonsType.OK,
-                             "Failed to connect: Could not contact the server."
-                             ,dialog)
+                                Gtk.ButtonsType.OK,
+                                _("Failed to connect: "
+                                    "Could not contact the server"),
+                                dialog)
                         dialog.server_address_entry.grab_focus()
                         dialog.server_address_entry.select_region(0, -1)
                     elif re.args[1] == 'NT_STATUS_NETWORK_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                "Failed to connect: The network is unreachable.\n\nPlease check your network connection.",
+                                _("Failed to connect: "
+                                    "The network is unreachable.\n\n"
+                                    "Please check your network connection"),
                                 dialog)
                     elif re.args[1] == 'NT_STATUS_CONNECTION_REFUSED':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
-                              Gtk.ButtonsType.OK,
-                              "Failed to connect: The connection was refused.",
-                              dialog)
+                                Gtk.ButtonsType.OK,
+                                _("Failed to connect: "
+                                    "The connection was refused"),
+                                dialog)
                     else:
-                        msg = "Failed to connect: %s." % (re.args[1])
+                        msg = _("Failed to connect: %s") % re.args[1]
                         print msg
                         traceback.print_exc()
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                             Gtk.ButtonsType.OK, msg, dialog)
 
                 except Exception, ex:
-                    msg = "Failed to connect: %s." % (str(ex))
+                    msg = _("Failed to connect: %s") % str(ex)
                     print msg
                     traceback.print_exc()
                     self.run_message_dialog(Gtk.MessageType.ERROR,
@@ -979,10 +900,10 @@ class SvcCtlWindow(Gtk.Window):
             self.pipe_manager.update_service(service)
             self.pipe_manager.fetch_service_status(service)
 
-            self.set_status("Service \'%s\' updated.") % (service.display_name)
+            self.set_status(_("Service '%s' updated") % service.display_name)
 
         except RuntimeError, re:
-            msg = "Failed to update service: %s." % (re.args[1])
+            msg = _("Failed to update service: %s") % re.args[1]
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -990,7 +911,7 @@ class SvcCtlWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to update service: %s." % (str(ex))
+            msg = _("Failed to update service: %s") % str(ex)
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1006,12 +927,13 @@ class SvcCtlWindow(Gtk.Window):
         if event.keyval == Gdk.KEY_F5: #refresh when F5 is pressed
             self.on_refresh_item_activate(None)
         elif event.keyval == Gdk.KEY_Return:
-            myev = Gdk.Event(Gdk.EventType._2BUTTON_PRESS) #emulate a double-click
+            # Emulate a double-click
+            myev = Gdk.Event(Gdk.EventType._2BUTTON_PRESS)
             self.on_services_tree_view_button_press(None, myev)
 
     def on_self_delete(self, widget, event):
         if (self.pipe_manager is not None):
-            self.on_disconnect_item_activate(self.disconnect_item)
+            self.on_disconnect_item_activate(self.disconnect_button)
 
         Gtk.main_quit()
         return False
@@ -1028,7 +950,7 @@ class SvcCtlWindow(Gtk.Window):
         self.pipe_manager = self.run_connect_dialog(None, server,
                 transport_type, username, password, connect_now)
         if (self.pipe_manager is not None):
-            self.set_status("Fetching services from %s..." % (server))
+            self.set_status(_("Fetching services from %s...") % server)
 
             FetchServicesThread(self.pipe_manager, self).start()
             #After this thread runs it will post a connected message.
@@ -1046,13 +968,10 @@ class SvcCtlWindow(Gtk.Window):
         self.update_sensitivity()
         self.update_captions()
 
-        self.set_status("Disconnected.")
-
-    def on_quit_item_activate(self, widget):
-        self.on_self_delete(None, None)
+        self.set_status(_("Disconnected."))
 
     def on_refresh_item_activate(self, widget):
-        self.set_status("Fetching services from %s..." % (self.server_address))
+        self.set_status(_("Fetching services from %s...") % self.server_address)
         FetchServicesThread(self.pipe_manager, self).start()
 
     def on_start_item_activate(self, widget):
@@ -1080,7 +999,7 @@ class SvcCtlWindow(Gtk.Window):
             self.pipe_manager.fetch_service_status(pause_resume_service)
 
         except RuntimeError, re:
-            msg = "Failed to fetch service status: %s." % (re.args[1])
+            msg = _("Failed to fetch service status: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1088,7 +1007,7 @@ class SvcCtlWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to fetch service status: %s." % (str(ex))
+            msg = _("Failed to fetch service status: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1109,13 +1028,14 @@ class SvcCtlWindow(Gtk.Window):
         edit_service = self.get_selected_service()
         self.run_service_edit_dialog(edit_service, self.update_service_callback)
 
-        self.set_status("Service \'%s\' updated." % (edit_service.display_name))
+        self.set_status(_("Service '%s' updated") % edit_service.display_name)
 
     def on_about_item_activate(self, widget):
         dialog = AboutDialog(
             "PyGWSvcCtl",
-            "A tool to remotely manage the services on a computer.\n Based on Jelmer Vernooij's original Samba-GTK",
-            self.icon_pixbuf)
+            _("A tool to remotely manage the services on a computer.\n"
+                "Based on Jelmer Vernooij's original Samba-GTK"),
+            'samba-gwsvcctl')
         dialog.run()
         dialog.hide()
 
@@ -1124,7 +1044,7 @@ class SvcCtlWindow(Gtk.Window):
             return
 
         if (event.type == Gdk.EventType._2BUTTON_PRESS):
-            self.on_properties_item_activate(self.properties_item)
+            self.on_properties_item_activate(self.properties_button)
 
     def on_update_captions(self, widget):
         self.update_captions()
@@ -1136,18 +1056,24 @@ class SvcCtlWindow(Gtk.Window):
 
 def PrintUsage():
     print "Usage: %s [OPTIONS]" % (str(os.path.split(__file__)[-1]))
-    print "All options are optional. The user will be queried for additional information if needed.\n"
+    print "All options are optional."
+    print "The user will be queried for additional information if needed.\n"
     print "  -s  --server\t\tspecify the server to connect to."
     print "  -u  --user\t\tspecify the user."
     print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type.\n\t\t\t\t0 for RPC, SMB, TCP/IP\n\t\t\t\t1 for RPC, TCP/IP\n\t\t\t\t2 for localhost."
+    print "  -t  --transport\tTransport type."
+    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
+    print "\t\t\t\t1 for RPC, TCP/IP"
+    print "\t\t\t\t2 for localhost."
     print "  -c  --connect-now\tSkip the connect dialog."
 
 def ParseArgs(argv):
     arguments = {}
 
     try: #get arguments into a nicer format
-        opts, args = getopt.getopt(argv, "chu:s:p:t:", ["help", "user=", "server=", "password=", "connect-now", "transport="])
+        opts, args = getopt.getopt(argv, "chu:s:p:t:", [
+                            "help", "user=", "server=", "password=",
+                            "connect-now", "transport="])
     except getopt.GetoptError:
         PrintUsage()
         sys.exit(2)
@@ -1170,15 +1096,22 @@ def ParseArgs(argv):
 
 """
     Info about the thread locks used in this utility:
-the pipe lock is <pipe manager instance>.lock.acquire() and .release()
-the gdk lock (main thread lock) is simply gtk.gdk.threads_enter() and .threads_leave(), no need to get an instance
-the gdk lock is automatically acquired and released with each iteration of the gtk.main() loop.
-    So that means every time a callback function is called in the main thread (for example on_connect_item_activate()),
-    it will automatically grab the lock, run the function, and release it afterwards
-If you have to, you may acquire both locks at the same time as long as you get the gdk lock first!
+The pipe lock is <pipe manager instance>.lock.acquire() and .release()
+The gdk lock (main thread lock) is simply gtk.gdk.threads_enter() and
+        .threads_leave(), no need to get an instance
+The gdk lock is automatically acquired and released with each iteration of the 
+        gtk.main() loop.
+    So that means every time a callback function is called in the main thread
+        (for example on_connect_item_activate()),
+    It will automatically grab the lock, run the function,
+        and release it afterwards
+If you have to, you may acquire both locks at the same time as long as
+        you get the gdk lock first!
 """
 if __name__ == "__main__":
-    arguments = ParseArgs(sys.argv[1:]) #the [1:] ignores the first argument, which is the path to our utility
+    GLib.set_prgname('gwsvcctl')
+    # The [1:] ignores the first argument, which is the path to our utility
+    arguments = ParseArgs(sys.argv[1:])
 
     GLib.threads_init()
     Gdk.threads_init()

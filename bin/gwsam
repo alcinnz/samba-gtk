@@ -4,11 +4,11 @@ import sys
 import os.path
 import traceback
 import getopt
-from gi.repository import GObject
-from gi.repository import Gtk
-from gi.repository import GdkPixbuf
-from gi.repository import Gdk
-sys.path.append('/opt/samba4/lib/python2.7/site-packages/')
+import gettext
+gettext.install('gwsam')
+
+from gi.repository import GObject, Gtk, GdkPixbuf, Gdk, GLib
+sys.path.append('/opt/samba4/lib/python2.7/site-packages/') #TODO Needed?
 from samba import credentials
 from samba.dcerpc import (
     samr,
@@ -23,7 +23,7 @@ from sambagtk.sam import (
     GroupEditDialog,
     SAMConnectDialog,
     )
-
+from sambagtk.moderngtk import get_resource, build_toolbar
 from sambagtk.dialogs import (
     AboutDialog,
     )
@@ -52,9 +52,13 @@ class SAMPipeManager(object):
         self.pipe = samr.samr(binding % (server_address), credentials = creds)
         connection_info = samr.ConnectInfo1()
         self.connect_handle = self.pipe.Connect5(None,
-                                                 0x00000030, #SAMR_SERVER_ACCESS_ENUM_DOMAINS | SAMR_SERVER_ACCESS_OPEN_DOMAIN. Copied from a Windows Vista machine. I couldn't find the correct constants in samr or security
-                                                 1,
-                                                 connection_info)[2] #Note the [2]!!
+        #SAMR_SERVER_ACCESS_ENUM_DOMAINS | SAMR_SERVER_ACCESS_OPEN_DOMAIN.
+        # Copied from a Windows Vista machine.
+        # I couldn't find the correct constants in samr or security
+                                                0x00000030,
+                                                1,
+                                                connection_info
+                                                )[2] #Note the [2]!!
 
     def close(self):
         if (self.pipe is not None):
@@ -86,7 +90,7 @@ class SAMPipeManager(object):
         del self.group_list[:]
 
         # fetch groups
-        #TODO: this section may not fetch all info that it should
+        # TODO: this section may not fetch all info that it should
         self.sam_groups = self.toArray(self.pipe.EnumDomainGroups(
                                                     self.domain_handle, 0, -1))
 
@@ -111,18 +115,25 @@ class SAMPipeManager(object):
         :return: 'user' with updated RID
         """
 
-        #Creates the new user on the server using default values for everything. Only the username is taken into account here.
+        #Creates the new user on the server using default values for everything.
+        # Only the username is taken into account here.
         (user_handle, rid) = self.pipe.CreateUser(self.domain_handle,
                                         self.set_lsa_string(user.username),
                                         security.SEC_FLAG_MAXIMUM_ALLOWED)
         new_user = self.fetch_user(rid)
 
         user.rid = rid #update the user's RID
-        if user.group_list == []: #The user must be part of a group. If the user is not part of any groups, the user is actually part of the "None" group!
-            user.group_list = new_user.group_list #use the default values assigned to the user when it was created on the server, which is probably "None"
+        # The user must be part of a group.
+        # If the user is not part of any groups,
+        #   the user is actually part of the "None" group!
+        if user.group_list == []:
+            # Use the default values assigned to the user
+            # when it was created on the server, which is probably "None"
+            user.group_list = new_user.group_list
 
         self.update_user(user) #send the other user information to the server.
-        user = self.fetch_user(rid, user) # just to make sure we have the updated user properties
+        
+        user = self.fetch_user(rid, user)
         self.user_list.append(user)
 
         return user
@@ -135,8 +146,8 @@ class SAMPipeManager(object):
         group = self.fetch_group(rid, group)
 
         self.update_group(group)
-        group = self.fetch_group(rid, group) # just to make sure we have the updated group properties
-
+        # just to make sure we have the updated group properties
+        group = self.fetch_group(rid, group)
 
         self.group_list.append(group)
 
@@ -156,7 +167,7 @@ class SAMPipeManager(object):
         #    Don't let this confuse you, it's essentially the same thing.
 
         info = self.pipe.QueryUserInfo(user_handle, samr.UserNameInformation)
-        # info.account_name = self.set_lsa_string(user.username) #Account name
+        #info.account_name = self.set_lsa_string(user.username) #Account name
         # should never be changed.
         info.full_name = self.set_lsa_string(user.fullname)
         self.pipe.SetUserInfo(user_handle, samr.UserNameInformation, info)
@@ -216,7 +227,10 @@ class SAMPipeManager(object):
         # The user must be part of a group. If the user is not part of any
         # groups, the user is actually part of the "None" group!
         if (user.group_list == []):
-            user.group_list = [grp for grp in self.group_list if grp.name == unicode("None")] #if grp.name == unicode("None")
+            user.group_list = [grp
+                                for grp in self.group_list
+                                if grp.name == unicode("None")
+                            ] #if grp.name == unicode("None")
 
         # remove the user from groups
         for group in group_list:
@@ -256,7 +270,8 @@ class SAMPipeManager(object):
                         break
 
         if ace is None:
-            print "unable to fetch security info for", user.username, "because none exists."
+            print ("unable to fetch security info for", user.username,
+                    "because none exists.")
             return user
 
         if user.cannot_change_password:
@@ -291,7 +306,8 @@ class SAMPipeManager(object):
         self.pipe.DeleteDomainGroup(group_handle)
 
     def fetch_user(self, rid, user=None):
-        """Fetch the User whose RID is 'rid'. A new User structure is created if the 'user' argument is left out.
+        """Fetch the User whose RID is 'rid'.
+            A new User structure is created if the 'user' argument is left out.
 
         Returns a User"""
         user_handle = self.pipe.OpenUser(self.domain_handle,
@@ -326,7 +342,8 @@ class SAMPipeManager(object):
     def info_to_user(self, query_info, user=None):
         """Converts 'query_info' information into a user type.
 
-        Values in 'user' will be overwriten by this function. If called with 'None' then a new User structure will be created
+        Values in 'user' will be overwriten by this function.
+        If called with 'None' then a new User structure will be created
 
         returns 'user
         '"""
@@ -342,14 +359,15 @@ class SAMPipeManager(object):
             user.rid = query_info.rid
 
         user.must_change_password = \
-                             (query_info.acct_flags & samr.ACB_PW_EXPIRED) != 0
+                            (query_info.acct_flags & samr.ACB_PW_EXPIRED) != 0
         user.password_never_expires = \
-                                (query_info.acct_flags & samr.ACB_PWNOEXP) != 0
+                            (query_info.acct_flags & samr.ACB_PWNOEXP) != 0
         user.account_disabled = \
-                               (query_info.acct_flags & samr.ACB_DISABLED) != 0
+                            (query_info.acct_flags & samr.ACB_DISABLED) != 0
         user.account_locked_out = \
-                               (query_info.acct_flags & samr.ACB_AUTOLOCK) != 0
-        #cannot_change_password doesn't get set in a flag, it's a little different
+                            (query_info.acct_flags & samr.ACB_AUTOLOCK) != 0
+        # cannot_change_password doesn't get set in a flag,
+        # it's a little different
         user.profile_path = self.get_lsa_string(query_info.profile_path)
         user.logon_script = self.get_lsa_string(query_info.logon_script)
         user.homedir_path = self.get_lsa_string(query_info.home_directory)
@@ -373,8 +391,8 @@ class SAMPipeManager(object):
         if DACL is not None :
             ace_list = DACL.aces
 
-            # we don't really need to find the user in ace_list because the first
-            # entry (S-1-1-0) should have the same flags anyways
+            # we don't really need to find the user in ace_list because
+            # the first entry (S-1-1-0) should have the same flags anyways
             ace =  ace_list[0]
             user.cannot_change_password = \
                 (samr.SAMR_USER_ACCESS_CHANGE_PASSWORD & ace.access_mask) == 0
@@ -450,7 +468,7 @@ class SAMWindow(Gtk.Window):
         self.username = username
         self.transport_type = transport_type
 
-        self.set_status("Disconnected.")
+        self.set_status(_("Disconnected"))
         self.on_connect_item_activate(None,
                                       server,
                                       transport_type,
@@ -468,170 +486,101 @@ class SAMWindow(Gtk.Window):
 
     def create(self):
         # main window
-        accel_group = Gtk.AccelGroup()
-
-        self.set_title("User/Group Management")
+        self.set_title(_("User/Group Management"))
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], "images", "group.png")
-        self.user_icon_filename = os.path.join(sys.path[0], "images",
-                                                                    "user.png")
-        self.group_icon_filename = os.path.join(sys.path[0], "images",
-                                                                   "group.png")
-        self.icon_pixbuf = GdkPixbuf.Pixbuf.new_from_file(self.icon_filename)
-        self.set_icon(self.icon_pixbuf)
+        # Oddly enough, there desktops don't usually seem to supply these icons
+        self.user_icon_filename = get_resource("user.png")
+        self.group_icon_filename = get_resource("group.png")
 
         vbox = Gtk.VBox(False, 0)
         self.add(vbox)
 
-        # menu
-        self.menubar = Gtk.MenuBar()
-        vbox.pack_start(self.menubar, False, False, 0)
+        # toolbar
+        self.toolbar = build_toolbar(self, vbox)
 
-        self.file_item = Gtk.MenuItem.new_with_mnemonic('_File')
-        self.menubar.add(self.file_item)
+        self.connect_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
+        self.connect_button.set_tooltip_text(_("Connect to a server"))
+        self.toolbar.add(self.connect_button)
 
-        file_menu = Gtk.Menu()
-        self.file_item.set_property("submenu",file_menu)
+        self.disconnect_button = Gtk.MenuToolButton.new_from_stock(
+                                                         Gtk.STOCK_DISCONNECT)
+        self.disconnect_button.set_tooltip_text(_("Disconnect from the server"))
+        self.toolbar.add(self.disconnect_button)
 
-        self.connect_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_CONNECT, accel_group)
-        self.connect_item.set_always_show_image(True)
-        file_menu.add(self.connect_item)
-
-
-        self.disconnect_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_DISCONNECT, accel_group)
-        self.disconnect_item.set_sensitive(False)
-        self.disconnect_item.set_always_show_image(True)
-        file_menu.add(self.disconnect_item)
-
-        self.sel_domain_item = Gtk.MenuItem.new_with_mnemonic("_Select Domain")
+        connect_menu = Gtk.Menu()
+        self.sel_domain_item = Gtk.MenuItem.new_with_mnemonic(
+                                            _("_Select Domain"))
         self.sel_domain_item.set_sensitive(False)
-        file_menu.add(self.sel_domain_item)
+        connect_menu.add(self.sel_domain_item)
+        connect_menu.show_all()
+        self.disconnect_button.set_menu(connect_menu)
 
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        menu_separator_item.set_property("sensitive",False)
-        file_menu.add(menu_separator_item)
+        self.refresh_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_REFRESH)
+        self.refresh_button.set_tooltip_text(_("Reload data from the server"))
+        self.toolbar.add(self.refresh_button)
 
-        self.quit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_QUIT, accel_group)
-        self.quit_item.set_always_show_image(True)
-        file_menu.add(self.quit_item)
+        self.toolbar.add(Gtk.SeparatorToolItem())
 
+        self.new_button = Gtk.ToolButton.new(None, _("Add User"))
+        self.new_button.set_icon_name('list-add')
+        self.new_button.set_tooltip_text(_("Add a new user"))
+        self.toolbar.add(self.new_button)
 
-        self.view_item = Gtk.MenuItem.new_with_mnemonic('_View')
-        self.menubar.add(self.view_item)
+        self.edit_button = Gtk.ToolButton.new(None, _("Edit User"))
+        self.edit_button.set_icon_name('edit')
+        self.edit_button.set_tooltip_text(_("Edit selected user"))
+        self.toolbar.add(self.edit_button)
 
-        view_menu = Gtk.Menu()
-        self.view_item.set_property("submenu",view_menu)
+        self.delete_button = Gtk.ToolButton.new(None, _("Delete User"))
+        self.delete_button.set_icon_name('list-remove')
+        self.delete_button.set_tooltip_text(_("Delete selected user"))
+        self.toolbar.add(self.delete_button)
+        
+        self.toolbar.add(Gtk.SeparatorToolItem())
+        
+        self.policies_button = Gtk.MenuToolButton.new(None,
+                                _("Configure Policies..."))
+        self.policies_button.set_icon_name('locked')
+        self.policies_button.set_tooltip_text(
+                                _("Configure selected user policies"))
+        #self.toolbar.add(self.policies_button)
 
-        self.refresh_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_REFRESH, accel_group)
-        self.refresh_item.set_sensitive(False)
-        self.refresh_item.set_always_show_image(True)
-        view_menu.add(self.refresh_item)
-
-
-        self.user_group_item = Gtk.MenuItem.new_with_mnemonic("_User")
-        self.menubar.add(self.user_group_item)
-
-        user_group_menu = Gtk.Menu()
-        self.user_group_item.set_submenu(user_group_menu)
-
-        self.new_item = Gtk.ImageMenuItem.new_from_stock(
-                                                    Gtk.STOCK_NEW, accel_group)
-        self.new_item.set_sensitive(False)
-        self.new_item.set_always_show_image(True)
-        user_group_menu.add(self.new_item)
-
-        self.delete_item = Gtk.ImageMenuItem.new_from_stock(
-                                                 Gtk.STOCK_DELETE, accel_group)
-        self.delete_item.set_sensitive(False)
-        self.delete_item.set_always_show_image(True)
-        user_group_menu.add(self.delete_item)
-
-        self.edit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_EDIT, accel_group)
-        self.edit_item.set_sensitive(False)
-        self.edit_item.set_always_show_image(True)
-        user_group_menu.add(self.edit_item)
-
-
-        self.policies_item = Gtk.MenuItem.new_with_mnemonic("_Policies")
-        # self.menubar.add(self.policies_item) TODO: implement policies functionality
-
+        # TODO: implement policies functionality
         policies_menu = Gtk.Menu()
-        self.policies_item.set_submenu(policies_menu)
 
-        self.user_rights_item = Gtk.MenuItem.new_with_mnemonic( "_User Rights")
+        self.user_rights_item = Gtk.MenuItem.new_with_mnemonic(_("_User Rights"))
         self.user_rights_item.set_sensitive(False)
         policies_menu.add(self.user_rights_item)
 
-        self.audit_item = Gtk.MenuItem.new_with_mnemonic("A_udit ")
+        self.audit_item = Gtk.MenuItem.new_with_mnemonic(_("A_udit"))
         self.audit_item.set_sensitive(False)
         policies_menu.add(self.audit_item)
 
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        menu_separator_item.set_property("sensitive",False)
-        policies_menu.add(menu_separator_item)
+        policies_menu.add(Gtk.SeparatorMenuItem())
 
         self.trust_relations_item = Gtk.MenuItem.new_with_mnemonic(
-                                                            "_Trust relations")
+                                _("_Trust relations"))
         self.trust_relations_item.set_sensitive(False)
         policies_menu.add(self.trust_relations_item)
+        
+        policies_menu.show_all()
+        self.policies_button.set_menu(policies_menu)
 
-        self.help_item = Gtk.MenuItem.new_with_mnemonic('_Help')
-        self.menubar.add(self.help_item)
-
-        help_menu = Gtk.Menu()
-        self.help_item.set_property("submenu",help_menu)
-
-        self.about_item = Gtk.ImageMenuItem.new_from_stock(
-                                                  Gtk.STOCK_ABOUT, accel_group)
-        self.about_item.set_always_show_image(True)
-        help_menu.add(self.about_item)
-
-        # toolbar
-        self.toolbar = Gtk.Toolbar()
-        vbox.pack_start(self.toolbar, False, False, 0)
-
-        self.connect_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
-        self.connect_button.set_is_important(True)
-        self.connect_button.set_tooltip_text('Connect to a server')
-        self.toolbar.insert(self.connect_button, 0)
-
-        self.disconnect_button = Gtk.ToolButton.new_from_stock(
-                                                         Gtk.STOCK_DISCONNECT)
-        self.disconnect_button.set_is_important(True)
-        self.disconnect_button.set_tooltip_text('Disconnect from the server')
-        self.toolbar.insert(self.disconnect_button, 1)
-
-        sep = Gtk.SeparatorToolItem()
-        self.toolbar.insert(sep, 2)
-
-        self.new_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_NEW)
-        self.new_button.set_is_important(True)
-        self.new_button.set_tooltip_text('Add a new Share')
-        self.toolbar.insert(self.new_button, 3)
-
-        self.edit_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_EDIT)
-        self.edit_button.set_is_important(True)
-        self.edit_button.set_tooltip_text('Edit a Share')
-        self.toolbar.insert(self.edit_button, 4)
-
-        self.delete_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_DELETE)
-        self.delete_button.set_is_important(True)
-        self.delete_button.set_tooltip_text('Delete a Share')
-        self.toolbar.insert(self.delete_button, 5)
+        self.about_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
+        self.about_button.set_tooltip_text(_("About GWSam..."))
+        if hasattr(self.toolbar, 'pack_end'):
+            self.toolbar.pack_end(self.about_button)
+        else:
+            self.toolbar.add(self.about_button)
 
         # user list
         self.users_groups_notebook = Gtk.Notebook()
         vbox.pack_start(self.users_groups_notebook, True, True, 0)
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
-        scrolledwindow.set_property("shadow_type",Gtk.ShadowType.IN)
+        scrolledwindow.set_property('shadow_type',Gtk.ShadowType.IN)
         self.users_groups_notebook.append_page(scrolledwindow,
-                                                        Gtk.Label("Users"))
+                                                        Gtk.Label(_("Users")))
 
         self.users_tree_view = Gtk.TreeView()
         scrolledwindow.add(self.users_tree_view)
@@ -646,7 +595,7 @@ class SAMWindow(Gtk.Window):
         self.users_tree_view.append_column(column)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Name')
+        column.set_title(_("Name"))
         column.set_resizable(True)
         column.set_sort_column_id(0)
         renderer = Gtk.CellRendererText()
@@ -655,7 +604,7 @@ class SAMWindow(Gtk.Window):
         column.add_attribute(renderer, 'text', 0)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Full Name')
+        column.set_title(_("Full Name"))
         column.set_resizable(True)
         column.set_sort_column_id(1)
         column.set_expand(True)
@@ -665,7 +614,7 @@ class SAMWindow(Gtk.Window):
         column.add_attribute(renderer, 'text', 1)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Description')
+        column.set_title(_("Description"))
         column.set_resizable(True)
         column.set_sort_column_id(2)
         column.set_expand(True)
@@ -675,7 +624,7 @@ class SAMWindow(Gtk.Window):
         column.add_attribute(renderer, 'text', 2)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('RID')
+        column.set_title(_("RID"))
         column.set_resizable(True)
         column.set_sort_column_id(3)
         renderer = Gtk.CellRendererText()
@@ -693,9 +642,9 @@ class SAMWindow(Gtk.Window):
         # group list
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
-        scrolledwindow.set_property("shadow_type",Gtk.ShadowType.IN)
+        scrolledwindow.set_property('shadow_type',Gtk.ShadowType.IN)
         self.users_groups_notebook.append_page(scrolledwindow,
-                                                        Gtk.Label("Groups"))
+                                                        Gtk.Label(_("Groups")))
 
         self.groups_tree_view = Gtk.TreeView()
         scrolledwindow.add(self.groups_tree_view)
@@ -710,7 +659,7 @@ class SAMWindow(Gtk.Window):
         self.groups_tree_view.append_column(column)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Name')
+        column.set_title(_("Name"))
         column.set_resizable(True)
         column.set_sort_column_id(0)
         renderer = Gtk.CellRendererText()
@@ -719,7 +668,7 @@ class SAMWindow(Gtk.Window):
         column.add_attribute(renderer, 'text', 0)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Description')
+        column.set_title(_("Description"))
         column.set_resizable(True)
         column.set_sort_column_id(1)
         column.set_expand(True)
@@ -729,7 +678,7 @@ class SAMWindow(Gtk.Window):
         column.add_attribute(renderer, 'text', 1)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('RID')
+        column.set_title(_("RID"))
         column.set_resizable(True)
         column.set_sort_column_id(2)
         renderer = Gtk.CellRendererText()
@@ -752,45 +701,38 @@ class SAMWindow(Gtk.Window):
 
         # signals/events
 
-        self.connect("delete_event", self.on_self_delete)
-        self.connect("key-press-event", self.on_key_press)
+        self.connect('delete_event', self.on_self_delete)
+        self.connect('key-press-event', self.on_key_press)
 
-        self.connect_item.connect("activate", self.on_connect_item_activate)
-        self.disconnect_item.connect("activate",
-                                            self.on_disconnect_item_activate)
-        self.sel_domain_item.connect("activate",
-                                            self.on_sel_domain_item_activate)
-        self.quit_item.connect("activate", self.on_quit_item_activate)
-        self.refresh_item.connect("activate", self.on_refresh_item_activate)
-        self.new_item.connect("activate", self.on_new_item_activate)
-        self.delete_item.connect("activate", self.on_delete_item_activate)
-        self.edit_item.connect("activate", self.on_edit_item_activate)
-        self.user_rights_item.connect("activate",
+        self.sel_domain_item.connect('activate',
+                                        self.on_sel_domain_item_activate)
+        self.user_rights_item.connect('activate',
                                         self.on_user_rights_item_activate)
-        self.audit_item.connect("activate", self.on_audit_item_activate)
-        self.trust_relations_item.connect("activate",
+        self.audit_item.connect('activate', self.on_audit_item_activate)
+        self.trust_relations_item.connect('activate',
                                         self.on_trust_relations_item_activate)
-        self.about_item.connect("activate", self.on_about_item_activate)
 
-        self.connect_button.connect("clicked", self.on_connect_item_activate)
-        self.disconnect_button.connect("clicked",
-                                            self.on_disconnect_item_activate)
-        self.new_button.connect("clicked", self.on_new_item_activate)
-        self.delete_button.connect("clicked", self.on_delete_item_activate)
-        self.edit_button.connect("clicked", self.on_edit_item_activate)
+        self.connect_button.connect('clicked', self.on_connect_item_activate)
+        self.disconnect_button.connect('clicked',
+                                        self.on_disconnect_item_activate)
+        self.refresh_button.connect('clicked', self.on_refresh_item_activate)
+        self.new_button.connect('clicked', self.on_new_item_activate)
+        self.delete_button.connect('clicked', self.on_delete_item_activate)
+        self.edit_button.connect('clicked', self.on_edit_item_activate)
+        self.policies_button.connect('clicked',
+                                        self.on_user_rights_item_activate)
+        self.about_button.connect('clicked', self.on_about_item_activate)
 
-        self.users_tree_view.get_selection().connect("changed",
-                                                self.on_update_sensitivity)
-        self.users_tree_view.connect("button_press_event",
+        self.users_tree_view.get_selection().connect('changed',
+                                        self.on_update_sensitivity)
+        self.users_tree_view.connect('button_press_event',
                                         self.on_users_tree_view_button_press)
-        self.groups_tree_view.get_selection().connect("changed",
-                                                self.on_update_sensitivity)
-        self.groups_tree_view.connect("button_press_event",
+        self.groups_tree_view.get_selection().connect('changed',
+                                        self.on_update_sensitivity)
+        self.groups_tree_view.connect('button_press_event',
                                         self.on_groups_tree_view_button_press)
-        self.users_groups_notebook.connect("switch-page",
+        self.users_groups_notebook.connect('switch-page',
                                     self.on_users_groups_notebook_switch_page)
-
-        self.add_accel_group(accel_group)
 
 
     def refresh_user_list_view(self):
@@ -830,7 +772,9 @@ class SAMWindow(Gtk.Window):
             return None
         else:
             username = model.get_value(iter, 0)
-            user_list = [user for user in self.pipe_manager.user_list if user.username == username]
+            user_list = [user
+                        for user in self.pipe_manager.user_list
+                        if user.username == username]
             if len(user_list) > 0:
                 return user_list[0]
             else:
@@ -845,7 +789,9 @@ class SAMWindow(Gtk.Window):
             return None
         else:
             name = model.get_value(iter, 0)
-            group_list = [group for group in self.pipe_manager.group_list if group.name == name]
+            group_list = [group
+                            for group in self.pipe_manager.group_list
+                            if group.name == name]
             if len(group_list) > 0:
                 return group_list[0]
             else:
@@ -862,32 +808,27 @@ class SAMWindow(Gtk.Window):
         selected = \
            [user_selected, group_selected][self.users_groups_notebook_page_num]
 
-        self.connect_item.set_sensitive(not connected)
-        self.disconnect_item.set_sensitive(connected)
-        self.sel_domain_item.set_sensitive(connected)
-        self.refresh_item.set_sensitive(connected)
-        self.new_item.set_sensitive(connected)
-        self.delete_item.set_sensitive(connected and selected)
-        self.edit_item.set_sensitive(connected and selected)
-        self.user_rights_item.set_sensitive(connected)
-        self.audit_item.set_sensitive(connected)
-        self.trust_relations_item.set_sensitive(connected)
-
         self.connect_button.set_sensitive(not connected)
         self.disconnect_button.set_sensitive(connected)
+        self.refresh_button.set_sensitive(connected)
         self.new_button.set_sensitive(connected)
         self.delete_button.set_sensitive(connected and selected)
         self.edit_button.set_sensitive(connected and selected)
+        self.policies_button.set_sensitive(connected)
 
     def update_captions(self):
-        self.user_group_item.get_child().set_text(["Users",
-                            "Groups"][self.users_groups_notebook_page_num > 0])
-        self.new_button.set_tooltip_text(["Create a new user",
-                "Create a new group"][self.users_groups_notebook_page_num > 0])
-        self.edit_button.set_tooltip_text(["Edit user's properties",
-           "Edit group's properties"][self.users_groups_notebook_page_num > 0])
-        self.delete_button.set_tooltip_text(["Delete the user",
-                  "Delete the group"][self.users_groups_notebook_page_num > 0])
+        self.new_button.set_tooltip_text([
+                _("Create a new user"),
+                _("Create a new group")
+            ][self.users_groups_notebook_page_num > 0])
+        self.edit_button.set_tooltip_text([
+                _("Edit user's properties"),
+                _("Edit group's properties")
+            ][self.users_groups_notebook_page_num > 0])
+        self.delete_button.set_tooltip_text([
+                _("Delete the user"),
+                _("Delete the group")
+            ][self.users_groups_notebook_page_num > 0])
 
     def run_message_dialog(self, type, buttons, message, parent=None):
         if parent is None:
@@ -917,7 +858,9 @@ class SAMWindow(Gtk.Window):
                 else:
                     dialog.values_to_user()
 
-                    if apply_callback is not None: #seems like there's only a callback when a user is modified, never when creating a new user.
+                    # Seems like there's only a callback
+                    # when a user is modified, never when creating a new user.
+                    if apply_callback is not None:
                         apply_callback(dialog.user)
                         dialog.user_to_values()
 
@@ -970,8 +913,10 @@ class SAMWindow(Gtk.Window):
     def run_connect_dialog(self, pipe_manager, server_address, transport_type,
             username, password, connect_now=False, domain_index=0,
             domains=None):
-        connect_now2 = connect_now #this other value is used later on to skip domain selection.
-        #We need a second variable for this or else we would freeze if we had an error while connecting
+        # This other value is used later on to skip domain selection.
+        connect_now2 = connect_now
+        # We need a second variable for this or else we would freeze
+        # if we had an error while connecting
 
         dialog = SAMConnectDialog(server_address,
                                   transport_type,
@@ -1009,48 +954,55 @@ class SAMWindow(Gtk.Window):
                         break
 
                     except RuntimeError, re:
-                        if re.args[1] == 'Logon failure': #user got the password wrong
+                        if re.args[1] == 'Logon failure':
+                            # User got the password wrong
                             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK,
-                                    "Failed to connect: Invalid username or password.",
+                                    _("Failed to connect: "
+                                        "Invalid username or password."),
                                     dialog)
                             dialog.password_entry.grab_focus()
-                            dialog.password_entry.select_region(0, -1) #select all the text in the password box
+                            # Select all the text in the password box
+                            dialog.password_entry.select_region(0, -1)
                         elif re.args[0] == 5 or re.args[1] == 'Access denied':
                             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK,
-                                    "Failed to connect: Access Denied.",
+                                    _("Failed to connect: Access Denied."),
                                     dialog)
                             dialog.username_entry.grab_focus()
                             dialog.username_entry.select_region(0, -1)
                         elif re.args[1] == 'NT_STATUS_HOST_UNREACHABLE':
                             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK,
-                                    "Failed to connect: Could not contact the server",
+                                    _("Failed to connect: "
+                                        "Could not contact the server"),
                                     dialog)
                             dialog.server_address_entry.grab_focus()
                             dialog.server_address_entry.select_region(0, -1)
                         elif re.args[1] == 'NT_STATUS_NETWORK_UNREACHABLE':
                             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK,
-                                    "Failed to connect: The network is unreachable.\n\nPlease check your network connection.",
+                                    _("Failed to connect: "
+                                        "The network is unreachable.\n\n"
+                                        "Please check your network connection."),
                                     dialog)
                         else:
-                            msg = "Failed to connect: %s." % (re.args[1])
+                            msg = _("Failed to connect: %s.") % (re.args[1])
                             print msg
                             traceback.print_exc()
                             self.run_message_dialog(Gtk.MessageType.ERROR,
                                                Gtk.ButtonsType.OK, msg, dialog)
 
                     except Exception, ex:
-                        msg = "Failed to connect: %s." % (str(ex))
+                        msg = _("Failed to connect: %s.") % (str(ex))
                         print msg
                         traceback.print_exc()
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                                Gtk.ButtonsType.OK, msg, dialog)
 
         dialog.set_domains(domains, self.domain_index)
-        #return RESPONSE_OK if we were told to auto-connect. Otherwise run the dialog
+        # Return RESPONSE_OK if we were told to auto-connect.
+        # Otherwise run the dialog
         response_id = connect_now2 and Gtk.ResponseType.OK or dialog.run()
         dialog.hide()
 
@@ -1069,10 +1021,10 @@ class SAMWindow(Gtk.Window):
         try:
             self.pipe_manager.update_user(user)
 
-            self.set_status("User \'%s\' updated." % (user.username))
+            self.set_status(_("User '%s' updated") % (user.username))
 
         except RuntimeError, re:
-            msg = "Failed to update user: %s." % (re.args[1])
+            msg = _("Failed to update user: %s") % (re.args[1])
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1080,7 +1032,7 @@ class SAMWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to update user: %s." % (str(ex))
+            msg = _("Failed to update user: %s") % (str(ex))
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1088,15 +1040,17 @@ class SAMWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         finally:
-            self.pipe_manager.fetch_user(user.rid, user) # to make sure we have the updated user properties. This has caught bugs already!
+            # to make sure we have the updated user properties.
+            # This has caught bugs already!
+            self.pipe_manager.fetch_user(user.rid, user)
             self.refresh_user_list_view()
 
     def update_group_callback(self, group):
         try:
             self.pipe_manager.update_group(group)
-            self.set_status("Group \'%s\' updated." % (group.name))
+            self.set_status(_("Group '%s' updated") % (group.name))
         except RuntimeError, re:
-            msg = "Failed to update group: %s." % (re.args[1])
+            msg = _("Failed to update group: %s") % (re.args[1])
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1104,14 +1058,15 @@ class SAMWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to update group: %s." % (str(ex))
+            msg = _("Failed to update group: %s") % (str(ex))
             print msg
             self.set_status(msg)
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK, msg)
         finally:
-            self.pipe_manager.fetch_group(group.rid, group) # just to make sure we have the updated group properties
+            # Just to make sure we have the updated group properties
+            self.pipe_manager.fetch_group(group.rid, group)
             self.refresh_group_list_view()
 
     def on_key_press(self, widget, event):
@@ -1120,7 +1075,8 @@ class SAMWindow(Gtk.Window):
         elif event.keyval == Gdk.KEY_Delete:
             self.on_delete_item_activate(None)
         elif event.keyval == Gdk.KEY_Return:
-            myev = Gdk.Event(Gdk.EventType._2BUTTON_PRESS) #emulate a double-click
+            # Emulate a double-click
+            myev = Gdk.Event(Gdk.EventType._2BUTTON_PRESS)
             if self.users_groups_notebook_page_num == 0:
                 self.on_users_tree_view_button_press(None, myev)
             else:
@@ -1128,7 +1084,7 @@ class SAMWindow(Gtk.Window):
 
     def on_self_delete(self, widget, event):
         if (self.pipe_manager is not None):
-            self.on_disconnect_item_activate(self.disconnect_item)
+            self.on_disconnect_item_activate(self.disconnect_button)
 
         Gtk.main_quit()
         return False
@@ -1150,12 +1106,12 @@ class SAMWindow(Gtk.Window):
             if self.pipe_manager is not None:
                 self.pipe_manager.fetch_users_and_groups()
 
-                self.set_status("Connected to %s/%s." % (
+                self.set_status(_("Connected to %s/%s") % (
                    self.server_address,
                    SAMPipeManager.get_lsa_string(self.pipe_manager.domain[1])))
 
         except RuntimeError, re:
-            msg = "Failed to open the selected domain: %s." % (re.args[1])
+            msg = _("Failed to open the selected domain: %s") % (re.args[1])
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1163,7 +1119,7 @@ class SAMWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to open the selected domain: %s." % (str(ex))
+            msg = _("Failed to open the selected domain: %s") % (str(ex))
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1183,7 +1139,7 @@ class SAMWindow(Gtk.Window):
         self.groups_store.clear()
         self.update_sensitivity()
 
-        self.set_status("Disconnected.")
+        self.set_status(_("Disconnected"))
 
     def on_sel_domain_item_activate(self, widget):
         try:
@@ -1193,11 +1149,14 @@ class SAMWindow(Gtk.Window):
             if self.pipe_manager is not None:
                 self.pipe_manager.fetch_users_and_groups()
 
-                self.set_status("Connected to %s/%s." % (self.server_address,
-                   SAMPipeManager.get_lsa_string(self.pipe_manager.domain[1])))
+                self.set_status(_("Connected to %s/%s") % (
+                    self.server_address,
+                    SAMPipeManager.get_lsa_string(self.pipe_manager.domain[1])
+                    )
+                )
 
         except RuntimeError, re:
-            msg = "Failed to open the selected domain: %s." % (re.args[1])
+            msg = _("Failed to open the selected domain: %s") % (re.args[1])
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1205,7 +1164,7 @@ class SAMWindow(Gtk.Window):
                                     Gtk.ButtonsType.OK, msg)
 
         except Exception, ex:
-            msg = "Failed to open the selected domain: %s." % (str(ex))
+            msg = _("Failed to open the selected domain: %s") % (str(ex))
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1216,21 +1175,18 @@ class SAMWindow(Gtk.Window):
         self.refresh_group_list_view()
         self.update_sensitivity()
 
-    def on_quit_item_activate(self, widget):
-        self.on_self_delete(None, None)
-
     def on_refresh_item_activate(self, widget):
         try:
             self.pipe_manager.fetch_users_and_groups()
         except RuntimeError, re:
-            msg = "Failed to refresh SAM info: %s." % (re.args[1])
+            msg = _("Failed to refresh SAM info: %s") % (re.args[1])
             self.set_status(msg)
             print msg
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                     Gtk.ButtonsType.OK, msg)
         except Exception, ex:
-            msg = "Failed to refresh SAM info: %s." % (str(ex))
+            msg = _("Failed to refresh SAM info: %s") % (str(ex))
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1240,7 +1196,7 @@ class SAMWindow(Gtk.Window):
         self.refresh_user_list_view()
         self.refresh_group_list_view()
 
-        self.set_status("Successfully refreshed Users and Groups.")
+        self.set_status(_("Successfully refreshed Users and Groups"))
 
         #deselect any selected groups and users
         (model, iter) = self.users_tree_view.get_selection().get_selected()
@@ -1259,23 +1215,23 @@ class SAMWindow(Gtk.Window):
         if self.users_groups_notebook_page_num == 0: # users tab
             new_user = self.run_user_edit_dialog()
             if new_user is None:
-                self.set_status("User creation canceled.")
+                self.set_status(_("User creation canceled"))
                 return
 
             try:
                 self.pipe_manager.add_user(new_user)
                 self.pipe_manager.fetch_users_and_groups()
-                self.set_status("Successfully created user \'%s\'." %
-                    (new_user.username))
+                self.set_status(_("Successfully created user '%s'") %
+                                    new_user.username)
             except RuntimeError, re:
-                msg = "Failed to create user: %s." % (re.args[1])
+                msg = _("Failed to create user: %s") % re.args[1]
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
                 self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
             except Exception, ex:
-                msg = "Failed to create user: %s." % (str(ex))
+                msg = _("Failed to create user: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1292,10 +1248,10 @@ class SAMWindow(Gtk.Window):
                 self.pipe_manager.add_group(new_group)
                 self.pipe_manager.fetch_users_and_groups()
 
-                self.set_status("Successfully created group \'%s\'." %
-                    (new_group.name,))
+                self.set_status(_("Successfully created group '%s'") %
+                    new_group.name)
             except RuntimeError, re:
-                msg = "Failed to create group: %s." % (re.args[1])
+                msg = _("Failed to create group: %s") % (re.args[1])
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1303,7 +1259,7 @@ class SAMWindow(Gtk.Window):
                                         Gtk.ButtonsType.OK, msg)
 
             except Exception, ex:
-                msg = "Failed to create group: %s." % (str(ex))
+                msg = _("Failed to create group: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1316,10 +1272,10 @@ class SAMWindow(Gtk.Window):
         if self.users_groups_notebook_page_num == 0: # users tab
             del_user = self.get_selected_user()
 
-            if (self.run_message_dialog(Gtk.MessageType.QUESTION,
+            if self.run_message_dialog(Gtk.MessageType.QUESTION,
                        Gtk.ButtonsType.YES_NO,
-                       "Do you want to delete user '%s'?" % del_user.username)
-                       != Gtk.ResponseType.YES):
+                       _("Do you want to delete user '%s'?") % del_user.username
+                    ) != Gtk.ResponseType.YES:
                 return
 
             try:
@@ -1327,16 +1283,16 @@ class SAMWindow(Gtk.Window):
                 self.pipe_manager.fetch_users_and_groups()
 
                 self.set_status(
-                    "Successfully deleted user \'%s\'." % (del_user.username))
+                    _("Successfully deleted user '%s'") % del_user.username)
             except RuntimeError, re:
-                msg = "Failed to delete user: %s." % (re.args[1])
+                msg = _("Failed to delete user: %s") % re.args[1]
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
                 self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
             except Exception, ex:
-                msg = "Failed to delete user: %s." % (str(ex))
+                msg = _("Failed to delete user: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1348,26 +1304,26 @@ class SAMWindow(Gtk.Window):
         else: # groups tab
             del_group = self.get_selected_group()
 
-            if (self.run_message_dialog(Gtk.MessageType.QUESTION,
+            if self.run_message_dialog(Gtk.MessageType.QUESTION,
                         Gtk.ButtonsType.YES_NO,
-                        "Do you want to delete group '%s'?" % del_group.name)
-                        != Gtk.ResponseType.YES):
+                        _("Do you want to delete group '%s'?") % del_group.name
+                    ) != Gtk.ResponseType.YES:
                 return
 
             try:
                 self.pipe_manager.delete_group(del_group)
                 self.pipe_manager.fetch_users_and_groups()
-                self.set_status("Successfully deleted group \'%s\'." %
-                        (del_group.name))
+                self.set_status(_("Successfully deleted group '%s'") %
+                        del_group.name)
             except RuntimeError, re:
-                msg = "Failed to delete group: %s." % (re.args[1])
+                msg = _("Failed to delete group: %s") % re.args[1]
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
                 self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
             except Exception, ex:
-                msg = "Failed to delete group: %s." % (str(ex))
+                msg = _("Failed to delete group: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1395,9 +1351,9 @@ class SAMWindow(Gtk.Window):
 
     def on_about_item_activate(self, widget):
         dialog = AboutDialog("PyGWSAM",
-            "A tool to manage accounts on a SAM server.\n"
-            "Based on Jelmer Vernooij's original Samba-GTK",
-            self.icon_pixbuf)
+            _("A tool to manage accounts on a SAM server.\n"
+            "Based on Jelmer Vernooij's original Samba-GTK"),
+            'samba-gwsam')
         dialog.run()
         dialog.hide()
 
@@ -1406,17 +1362,18 @@ class SAMWindow(Gtk.Window):
             return
 
         if event.type == Gdk.EventType._2BUTTON_PRESS:
-            self.on_edit_item_activate(self.edit_item)
+            self.on_edit_item_activate(self.edit_button)
 
     def on_groups_tree_view_button_press(self, widget, event):
         if self.get_selected_group() is None:
             return
 
         if event.type == Gdk.EventType._2BUTTON_PRESS:
-            self.on_edit_item_activate(self.edit_item)
+            self.on_edit_item_activate(self.edit_button)
 
     def on_users_groups_notebook_switch_page(self, widget, page, page_num):
-        self.users_groups_notebook_page_num = page_num # workaround - the signal is emitted before the actual change
+        # Workaround - the signal is emitted before the actual change
+        self.users_groups_notebook_page_num = page_num
         self.update_captions()
         self.update_sensitivity()
 
@@ -1426,19 +1383,27 @@ class SAMWindow(Gtk.Window):
 
 def PrintUsage():
     print "Usage: %s [OPTIONS]" % (str(os.path.split(__file__)[-1]))
-    print "All options are optional. The user will be queried for additional information if needed.\n"
+    print "All options are optional. "
+    print "The user will be queried for additional information if needed.\n"
     print "  -s  --server\t\tspecify the server to connect to."
     print "  -u  --user\t\tspecify the user."
     print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type.\n\t\t\t\t0 for RPC, SMB, TCP/IP\n\t\t\t\t1 for RPC, TCP/IP\n\t\t\t\t2 for localhost."
+    print "  -t  --transport\tTransport type."
+    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
+    print "\t\t\t\t1 for RPC, TCP/IP"
+    print "\t\t\t\t2 for localhost."
     print "  -c  --connect-now\tSkip the connect dialog."
-    #TODO: mention domain index. And maybe come up with a better way of handling it?
+    #TODO: mention domain index.
+    # And maybe come up with a better way of handling it?
 
 def ParseArgs(argv):
     arguments = {}
 
     try: #get arguments into a nicer format
-        opts, args = getopt.getopt(argv, "chu:s:p:t:", ["help", "user=", "server=", "password=", "connect-now", "transport="])
+        opts, args = getopt.getopt(argv, "chu:s:p:t:", [
+                                            "help", "user=",
+                                            "server=", "password=",
+                                            "connect-now", "transport="])
     except getopt.GetoptError:
         PrintUsage()
         sys.exit(2)
@@ -1462,7 +1427,9 @@ def ParseArgs(argv):
 
 
 if __name__ == "__main__":
-    arguments = ParseArgs(sys.argv[1:]) #the [1:] ignores the first argument, which is the path to our utility
+    GLib.set_prgname('gwsam')
+    # The [1:] ignores the first argument, which is the path to our utility
+    arguments = ParseArgs(sys.argv[1:]) 
 
     main_window = SAMWindow(**arguments)
     main_window.show_all()

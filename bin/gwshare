@@ -29,6 +29,8 @@ import sys
 import os.path
 import traceback
 import getopt
+import gettext
+gettext.install('gwshare')
 from gi.repository import Gtk
 from gi.repository import GdkPixbuf
 from gi.repository import Gdk
@@ -44,6 +46,7 @@ from sambagtk.pysrvsvc import (
     ShareAddEditDialog,
     srvsvcConnectDialog,
     ShareWizardDialog )
+from sambagtk.moderngtk import build_toolbar
 
 class srvsvcPipeManager(object):
 
@@ -94,7 +97,8 @@ class srvsvcPipeManager(object):
 
         if server_address in ('127.0.0.1', 'localhost'):
             self.islocal = True
-        # Not really necessary from the point of view of the pipe itself but later sections depend on it
+        # Not really necessary from the point of view of the pipe itself
+        # but later sections depend on it
         else:
             self.islocal = False
 
@@ -136,13 +140,13 @@ class srvsvcPipeManager(object):
 
         base_dict = {
             srvsvc.STYPE_DISKTREE: {'typestring': 'STYPE_DISKTREE',
-                                    'desc': 'Disktree (Folder) Share'},
+                                    'desc': _("Disktree (Folder) Share")},
             srvsvc.STYPE_PRINTQ: {'typestring': 'STYPE_PRINTQ',
-                                  'desc': 'Print Queue Share'},
+                                  'desc': _("Print Queue Share")},
             srvsvc.STYPE_DEVICE: {'typestring': 'STYPE_DEVICE',
-                                  'desc': 'Device Share'},
+                                  'desc': _("Device Share")},
             srvsvc.STYPE_IPC: {'typestring': 'STYPE_IPC',
-                               'desc': 'IPC Share'},
+                               'desc': _("IPC Share")},
             }
 
         flag_temp = False
@@ -155,31 +159,29 @@ class srvsvcPipeManager(object):
         if flag_temp is True and flag_hidden is False:
             stype_base = stype - srvsvc.STYPE_TEMPORARY
             base_str = base_dict.get(stype_base).get('typestring')
-            stype_typestring = ''.join([base_str, '_TEMPORARY'])
-            stype_desc = ' '.join(['Temporary',
-                                  base_dict.get(stype_base).get('desc'
-                                  )])
+            stype_typestring = ''.join([base_str, _("_TEMPORARY")])
+            stype_desc = ' '.join([_("Temporary"),
+                                  base_dict.get(stype_base).get('desc')
+                                  ])
         elif flag_temp is False and flag_hidden is True:
 
             stype_base = stype + srvsvc.STYPE_HIDDEN
             base_str = base_dict.get(stype_base).get('typestring')
-            stype_typestring = ''.join([base_str, '_HIDDEN'])
-            stype_desc = ' '.join(['Hidden',
-                                  base_dict.get(stype_base).get('desc'
-                                  )])
+            stype_typestring = ''.join([base_str, _("_HIDDEN")])
+            stype_desc = ' '.join([_("Hidden"),
+                                  base_dict.get(stype_base).get('desc')
+                                  ])
         elif flag_temp is True and flag_hidden is True:
 
-            stype_base = stype - srvsvc.STYPE_TEMPORARY\
-                 + srvsvc.STYPE_HIDDEN
+            stype_base = stype - srvsvc.STYPE_TEMPORARY + srvsvc.STYPE_HIDDEN
             base_str = base_dict.get(stype_base).get('typestring')
-            stype_typestring = ''.join([base_str, '_TEMPORARY_HIDDEN'])
-            stype_desc = ' '.join(['Temporary Hidden',
-                                  base_dict.get(stype_base).get('desc'
-                                  )])
+            stype_typestring = ''.join([base_str, _("_TEMPORARY_HIDDEN")])
+            stype_desc = ' '.join([_("Temporary Hidden"),
+                                  base_dict.get(stype_base).get('desc')
+                                  ])
         else:
             stype_base = stype
-            stype_typestring = \
-                base_dict.get(stype_base).get('typestring')
+            stype_typestring = base_dict.get(stype_base).get('typestring')
             stype_desc = base_dict.get(stype_base).get('desc')
 
         stype_info_dict = {
@@ -337,7 +339,8 @@ class srvsvcPipeManager(object):
 
     def get_share_info_local(self, name=''):
         """
-        Gets share info for a share with a particular name from local cache lists.
+        Gets share info for a share with a particular name
+        from local cache lists.
 
         `Usage`:
         S.get_share_info_local(self,name= "") -> sahre_info (502 type)
@@ -376,7 +379,8 @@ class srvsvcPipeManager(object):
         Delete a share with the given name.
 
         `Usage`:
-        S.delete_share (self,name= "") -> Boolean indicating success or faliure ,[error object]
+        S.delete_share (self,name= "") -> Boolean indicating success or failure,
+                                            [error object]
         """
 
         name = unicode(name)
@@ -394,7 +398,8 @@ class srvsvcPipeManager(object):
         """
         Returns type of share code
 
-        uses local cache for now as the rpc server in samba4 does not support it yet
+        uses local cache for now as the rpc server in samba4
+        does not support it yet
         `Usage`:
         S.update_tod()
         """
@@ -440,7 +445,8 @@ class srvsvcPipeManager(object):
         Filepath must be full path relative to basepath of share's path.
 
         `Usage`:
-        S.set_file_security (self,secdesc,sd_buf,sharename= "",filepath= "") -> Boolean succes,[error]
+        S.set_file_security (self,secdesc,sd_buf,sharename= "",filepath= "")
+                -> Boolean succes,[error]
         """
 
         sharename = unicode(sharename)
@@ -466,7 +472,7 @@ class srvsvcPipeManager(object):
             srvsvc.PLATFORM_ID_OS2: {'typestring': 'PLATFORM_ID_OS2',
                     'desc': 'OS2'},
             srvsvc.PLATFORM_ID_NT: {'typestring': 'PLATFORM_ID_NT',
-                                    'desc': 'Windows NT or newer'},
+                                    'desc': _("Windows NT or newer")},
             srvsvc.PLATFORM_ID_OSF: {'typestring': 'PLATFORM_ID_OSF',
                     'desc': 'OSF/1'},
             srvsvc.PLATFORM_ID_VMS: {'typestring': 'PLATFORM_ID_VMS',
@@ -480,7 +486,9 @@ class srvsvcPipeManager(object):
         Gets a 502 type share object.
 
         Usage:
-        S.get_share_object(self,name= "",comment= "",max_users= 0xFFFFFFFF,password= "",path= "",permissions= None,sd_buf=None) -> share (502 type share object)
+        S.get_share_object(self, name= "", comment= "", max_users=0xFFFFFFFF,
+                            password= "", path= "", permissions=None,
+                            sd_buf=None) -> share (502 type share object)
         """
 
         share = srvsvc.NetShareInfo502()
@@ -500,15 +508,15 @@ class srvsvcPipeManager(object):
     def name_validate(self, name):
         """
         Validate a Given Share Name .
-        Returns True for a given share name and false for a invalid one .
-        It does so gracefully without raising a exception. Thus validating  name cleanly
+        Returns True for a given share name and false for a invalid one.
+        It does so gracefully without raising a exception.
+            Thus validating name cleanly
         `Usage` :
         S.name_validate(name) -> Boolean Indicating Validity
         """
 
         try:
-            self.pipe.NetNameValidate(self.server_unc, name, 9,
-                    0)
+            self.pipe.NetNameValidate(self.server_unc, name, 9, 0)
             return True
         except RuntimeError:
             return False
@@ -551,7 +559,7 @@ class ShareWindow(Gtk.Window):
         self.server_info = None
 
         self.create()
-        self.set_status('Disconnected.')
+        self.set_status(_("Disconnected"))
         self.on_connect_item_activate(None, server, transport_type,
                                         username, password, connect_now)
         self.show_all()
@@ -572,12 +580,12 @@ class ShareWindow(Gtk.Window):
         self.statusbar.pop(0)
         self.statusbar.push(0, message)
 
-    def run_message_dialog(self, type, buttons, message, parent=None):
+    def run_message_dialog(self, type_, buttons, message, parent=None):
         if parent is None:
             parent = self
 
-        message_box = Gtk.MessageDialog(parent, Gtk.DialogFlags.MODAL
-                , type, buttons, message)
+        message_box = Gtk.MessageDialog(parent, Gtk.DialogFlags.MODAL,
+                    type_, buttons, message)
         response = message_box.run()
         message_box.hide()
 
@@ -602,12 +610,12 @@ class ShareWindow(Gtk.Window):
                 self.server_info = self.pipe_manager.server_info
 
                 self.set_status(
-                          'Connected to Server: IP=%s NETBios Name=%s.'
+                          _("Connected to Server: IP=%s NETBios Name=%s")
                            % (self.server_address,
                             self.pipe_manager.server_info.server_name))
         except RuntimeError, re:
 
-            msg = 'Failed to connect: %s.' % re.args[1]
+            msg = _("Failed to connect: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -615,7 +623,7 @@ class ShareWindow(Gtk.Window):
                                 Gtk.ButtonsType.OK, msg)
         except Exception, ex:
 
-            msg = 'Failed to connect: %s.' % str(ex)
+            msg = _("Failed to connect: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -658,50 +666,48 @@ class ShareWindow(Gtk.Window):
                     break
                 except RuntimeError, re:
 
-                    if re.args[1] == 'Logon failure':  # user got the password wrong
+                    # User got the password wrong
+                    if re.args[1] == 'Logon failure':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Invalid username or password.'
-                                , dialog)
+                                _("Failed to connect: "
+                                    "Invalid username or password"),
+                                dialog)
                         dialog.password_entry.grab_focus()
-                        dialog.password_entry.select_region(0,
-                                -1)  # select all the text in the password box
-                    elif re.args[0] == 5 or re.args[1]\
-                         == 'Access denied':
+                        # Select all the text in the password box
+                        dialog.password_entry.select_region(0, -1)
+                    elif re.args[0] == 5 or re.args[1] == 'Access denied':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Access Denied.',
+                                _("Failed to connect: Access Denied"),
                                 dialog)
                         dialog.username_entry.grab_focus()
                         dialog.username_entry.select_region(0,
                                 -1)
-                    elif re.args[1]\
-                         == 'NT_STATUS_HOST_UNREACHABLE':
+                    elif re.args[1] == 'NT_STATUS_HOST_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Could not contact the server'
-                                , dialog)
+                                _("Failed to connect: "
+                                    "Could not contact the server"),
+                                dialog)
                         dialog.server_address_entry.grab_focus()
-                        dialog.server_address_entry.select_region(0,
-                                -1)
-                    elif re.args[1]\
-                         == 'NT_STATUS_NETWORK_UNREACHABLE':
+                        dialog.server_address_entry.select_region(0, -1)
+                    elif re.args[1] == 'NT_STATUS_NETWORK_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                '''Failed to connect: The network is unreachable.
-
-Please check your network connection.''',
+                                _("Failed to connect: "
+                                    "The network is unreachable.\n\n"
+                                    "Please check your network connection."),
                                 dialog)
                     else:
-                        msg = 'Failed to connect: %s.'\
-                             % re.args[1]
+                        msg = _("Failed to connect: %s") % re.args[1]
                         print msg
                         traceback.print_exc()
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK, msg, dialog)
                 except Exception, ex:
 
-                    msg = 'Failed to connect: %s.' % str(ex)
+                    msg = _("Failed to connect: %s") % str(ex)
                     print msg
                     traceback.print_exc()
                     self.run_message_dialog(Gtk.MessageType.ERROR,
@@ -724,17 +730,16 @@ Please check your network connection.''',
         self.update_sensitivity()
 
     def fill_server_info(self):
-        """ Gracious fill out server info """
+        """Gracious fill out server info """
 
         for widget in self.sd_frame.get_children():
             if type(widget) is Gtk.Grid:
                 self.sd_frame.remove(widget)
 
         if self.server_info is None:
-            self.srv_info_label.set_markup('<b>Server Disconnected</b>')
+            self.srv_info_label.set_markup(_("<b>Server Disconnected</b>"))
 
-            my_lables = \
-                self.srvinfo_frame.get_children()[0].get_children()
+            my_lables = self.srvinfo_frame.get_children()[0].get_children()
             for label in my_lables:
                 label.set_sensitive(False)
 
@@ -744,21 +749,18 @@ Please check your network connection.''',
             grid.set_row_homogeneous(True)
             grid.set_column_homogeneous(True)
 
-            label = Gtk.Label('Not connected to share server.',
-                                                xalign=1,yalign=0.5)
+            label = Gtk.Label(_("Not connected to share server"),
+                                                xalign=1, yalign=0.5)
             grid.add(label)
 
         else:
-            self.srv_info_label.set_markup('<b>Share Server Details</b>'
-                    )
+            self.srv_info_label.set_markup(_("<b>Share Server Details</b>"))
 
-            my_lables = \
-                self.srvinfo_frame.get_children()[0].get_children()
+            my_lables = self.srvinfo_frame.get_children()[0].get_children()
             for label in my_lables:
                 label.set_sensitive(True)
 
-            label_data = \
-                self.pipe_manager.get_platform_info(
+            label_data = self.pipe_manager.get_platform_info(
                                    self.server_info.platform_id, 'desc')
             self.srvinfo_tos_label.set_text(label_data)
             self.srvinfo_name_label.set_text('\\'
@@ -771,55 +773,47 @@ Please check your network connection.''',
             self.srvinfo_version_label.set_text(label_data)
             server_typedict = {
                 1: ('SV_TYPE_WORKSTATION',
-                             'Workstation Service'),
-                2: ('SV_TYPE_SERVER', 'Server Service'),
-                4: ('SV_TYPE_SQLSERVER', 'SQL Server'),
-                8: ('SV_TYPE_DOMAIN_CTRL',
-                             'Primary Domain Controller'),
+                             _("Workstation Service")),
+                2: ('SV_TYPE_SERVER', _("Server Service")),
+                4: ('SV_TYPE_SQLSERVER', _("SQL Server")),
+                8: ('SV_TYPE_DOMAIN_CTRL', _("Primary Domain Controller")),
                 0x00000010: ('SV_TYPE_DOMAIN_BAKCTRL',
-                             'Backup Domain Controller'),
-                0x00000020: ('SV_TYPE_TIME_SOURCE', 'Time Source'),
-                0x00000040: ('SV_TYPE_AFP', 'Apple File Protocol Server'
-                             ),
-                0x00000080: ('SV_TYPE_NOVELL', 'Novel Server'),
+                             _("Backup Domain Controller")),
+                0x00000020: ('SV_TYPE_TIME_SOURCE', _("Time Source")),
+                0x00000040: ('SV_TYPE_AFP', _("Apple File Protocol Server")),
+                0x00000080: ('SV_TYPE_NOVELL', _("Novel Server")),
                 0x00000100: ('SV_TYPE_DOMAIN_MEMBER',
-                             'LAN Manager 2.x Domain Member'),
+                             _("LAN Manager 2.x Domain Member")),
                 0x40000000: ('SV_TYPE_LOCAL_LIST_ONLY',
-                             'Server Maintained By the Browser'),
-                0x00000200: ('SV_TYPE_PRINTQ_SERVER',
-                             'Print Queue Server'),
-                0x00000400: ('SV_TYPE_DIALIN_SERVER', 'Dial-In Server'
-                             ),
-                0x00000800: ('SV_TYPE_XENIX_SERVER', 'Xenix Server'),
+                             _("Server Maintained By the Browser")),
+                0x00000200: ('SV_TYPE_PRINTQ_SERVER', _("Print Queue Server")),
+                0x00000400: ('SV_TYPE_DIALIN_SERVER', _("Dial-In Server")),
+                0x00000800: ('SV_TYPE_XENIX_SERVER', _("Xenix Server")),
                 0x00004000: ('SV_TYPE_SERVER_MFPN',
-                             'Microsoft File and Print for NetWare'),
-                0x00001000: ('SV_TYPE_NT', 'Windows NT/XP/2003 or Newer'
-                             ),
-                0x00002000: ('SV_TYPE_WFW', 'Windows for Workgroups'),
+                             _("Microsoft File and Print for NetWare")),
+                0x00001000: ('SV_TYPE_NT', _("Windows NT/XP/2003 or Newer")),
+                0x00002000: ('SV_TYPE_WFW', _("Windows for Workgroups")),
                 0x00008000: ('SV_TYPE_SERVER_NT',
-                             'Non DC Windows Server 2000/2003 or Newer'
-                             ),
+                             _("Non DC Windows Server 2000/2003 or Newer")),
                 0x00010000: ('SV_TYPE_POTENTIAL_BROWSER',
-                             'Potential Browser Service '),
+                             _("Potential Browser Service")),
                 0x00020000: ('SV_TYPE_BACKUP_BROWSER',
-                             'Browser Service As Backup'),
+                             _("Browser Service As Backup")),
                 0x00040000: ('SV_TYPE_MASTER_BROWSER',
-                             'Master Browser Service'),
+                             _("Master Browser Service")),
                 0x00080000: ('SV_TYPE_DOMAIN_MASTER',
-                             'Domain Master Browser'),
-                0x80000000: ('SV_TYPE_DOMAIN_ENUM', 'Primary Domain'),
-                0x00400000: ('SV_TYPE_WINDOWS', 'Windows ME/98/95'),
-                0xFFFFFFFF: ('SV_TYPE_ALL', 'All Servers'),
-                0x02000000: ('SV_TYPE_TERMINALSERVER', 'Terminal Server'
-                             ),
-                0x10000000: ('SV_TYPE_CLUSTER_NT', 'Server Cluster'),
+                             _("Domain Master Browser")),
+                0x80000000: ('SV_TYPE_DOMAIN_ENUM', _("Primary Domain")),
+                0x00400000: ('SV_TYPE_WINDOWS', _("Windows ME/98/95")),
+                0xFFFFFFFF: ('SV_TYPE_ALL', _("All Servers")),
+                0x02000000: ('SV_TYPE_TERMINALSERVER', _("Terminal Server")),
+                0x10000000: ('SV_TYPE_CLUSTER_NT', _("Server Cluster")),
                 0x04000000: ('SV_TYPE_CLUSTER_VS_NT',
-                             'Virtual Server Cluster'),
+                             _("Virtual Server Cluster")),
                 }
 
-            label_data = \
-                server_typedict.get(self.server_info.server_type, ('',
-                                    'Multiple Capablities'))[1]
+            label_data = server_typedict.get(self.server_info.server_type,
+                                    ('', _("Multiple Capablities")))[1]
             self.srvinfo_type_label.set_text(label_data)
             self.srvinfo_upath_label.set_text(
                                     self.server_info.userpath.upper())
@@ -830,21 +824,20 @@ Please check your network connection.''',
 
             num_disks = len(self.pipe_manager.disks_list)
 
-            #table = gtk.Table(num_disks + 2, 2, True)
             grid = Gtk.Grid()
             grid.set_border_width(5)
             grid.set_row_spacing(4)
             grid.set_row_homogeneous(True)
             grid.set_column_homogeneous(True)
 
-            label = Gtk.Label('<b> Disks </b>',xalign=0.1,yalign=0.5)
-            label.set_property("use-markup",True)
+            label = Gtk.Label(_("<b> Disks </b>"), xalign=0.1, yalign=0.5)
+            label.set_property('use-markup',True)
 
             grid.attach(label, 0, 0, 1, 1)
             filler = Gtk.Label("")
             grid.attach_next_to(filler,label,
                                 Gtk.PositionType.BOTTOM, 1, 1)
-            #variable holding the immediate upper grid location , swap each time
+            # Variable holding the immediate upper grid location, swap each time
             tmp = filler
 
             for i in self.pipe_manager.disks_list:
@@ -860,15 +853,14 @@ Please check your network connection.''',
         if not self.connected():
             return None
 
-        (model, iter) = \
-            self.shares_tree_view.get_selection().get_selected()
-        if iter is None:  # no selection
+        (model, iter) = self.shares_tree_view.get_selection().get_selected()
+        if iter is None:  # No selection
             return None
         else:
             share_name = model.get_value(iter, 0)
-            share_list = [share for share in
-                          self.pipe_manager.share_list if share.name
-                           == share_name]
+            share_list = [share
+                            for share in self.pipe_manager.share_list
+                            if share.name == share_name]
             if len(share_list) > 0:
                 return share_list[0]
             else:
@@ -876,10 +868,9 @@ Please check your network connection.''',
 
     def on_about_item_activate(self, widget):
         dialog = AboutDialog('PyGWShare',
-                             "A tool to manage user shares on a SRVS Share server.\nBased on Jelmer Vernooij's original Samba-GTK"
-                             , self.icon_pixbuf)
-        dialog.set_copyright('Copyright \xc2\xa9 2011 Dhananjay Sathe <dhananjaysathe@gmail.com>'
-                             )
+                 _("A tool to manage user shares on a SRVS Share server.\n"
+                    "Based on Jelmer Vernooij's original Samba-GTK"),
+                 'samba-gwshare')
         dialog.run()
         dialog.hide()
 
@@ -934,24 +925,13 @@ Please check your network connection.''',
         selected = self.get_selected_share() is not None\
              and share_page_active
 
-        self.connect_item.set_sensitive(not connected)
-        self.disconnect_item.set_sensitive(connected)
-        self.refresh_item.set_sensitive(connected)
-
-        self.new_item.set_sensitive(connected and share_page_active)
-        self.delete_item.set_sensitive(connected and selected)
-        self.edit_item.set_sensitive(connected and selected)
-        self.new_share_wizard_item.set_sensitive(connected
-                 and share_page_active)
-
         self.connect_button.set_sensitive(not connected)
         self.disconnect_button.set_sensitive(connected)
+        self.refresh_button.set_sensitive(connected)
 
         self.new_button.set_sensitive(connected and share_page_active)
         self.delete_button.set_sensitive(connected and selected)
         self.edit_button.set_sensitive(connected and selected)
-        self.new_share_wizard_button.set_sensitive(connected
-                 and share_page_active)
 
         self.active_frame_new_button.set_sensitive(connected
                  and share_page_active)
@@ -971,11 +951,10 @@ Please check your network connection.''',
         self.fill_active_pane()
         self.fill_server_info()
 
-        self.set_status('Disconnected.')
+        self.set_status(_("Disconnected"))
 
     def toggle_share_view_visiblity(self, widget, Junk):
         """ Toggels Visiblity of hidden shares if authorised """
-
         is_visible = self.show_all_share_checkbox.get_active()
         self.pipe_manager.show_all_shares = is_visible
         self.pipe_manager.get_shares_list()
@@ -992,34 +971,30 @@ Please check your network connection.''',
             self.on_delete_item_activate(None)
         elif event.keyval == Gdk.KEY_Return:
             myev = Gdk.Event(Gdk.EventType._2BUTTON_PRESS)
-            # emulates a double-click
+            # Emulates a double-click
             if self.active_page_index == 0:
                 self.on_shares_tree_view_button_press(None, myev)
-
-    def on_quit_item_activate(self, widget):
-        self.on_self_delete(None, None)
 
     def on_new_item_activate(self, widget, wizard_mode=False):
 
         share = self.run_share_add_edit_dialog(wizard_mode=wizard_mode)
 
         if share is None:
-            self.set_status('Share creation canceled.')
+            self.set_status(_("Share creation canceled"))
             return
 
         try:
             self.pipe_manager.add_share(share)
-            self.set_status("Successfully added share \'%s\'."
-                             % share.name)
+            self.set_status(_("Successfully added share '%s'") % share.name)
         except RuntimeError, re:
-            msg = 'Failed to add share: %s.' % re.args[1]
+            msg = _("Failed to add share: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
         except Exception, ex:
-            msg = 'Failed to ad share: %s.' % str(ex)
+            msg = _("Failed to ad share: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1033,22 +1008,21 @@ Please check your network connection.''',
         share = self.run_share_add_edit_dialog(share,
                 self.update_share_callback)
         if share is None:
-            self.set_status('Last Share Edit Cancelled.')
+            self.set_status(_("Last Share Edit Cancelled"))
             return
 
         try:
             self.pipe_manager.modify_share(share)
-            self.set_status("Successfully modified share \'%s\'."
-                             % share.name)
+            self.set_status(_("Successfully modified share '%s'") % share.name)
         except RuntimeError, re:
-            msg = 'Failed to add share: %s.' % re.args[1]
+            msg = _("Failed to add share: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
         except Exception, ex:
-            msg = 'Failed to ad share: %s.' % str(ex)
+            msg = _("Failed to ad share: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1065,19 +1039,18 @@ Please check your network connection.''',
 
             try:
                 self.pipe_manager.delete_share(share.name)
-                self.set_status("Successfully deleted share \'%s\'."
+                self.set_status(_("Successfully deleted share '%s'")
                                  % share.name)
             except RuntimeError, re:
 
-                msg = 'Failed to delete share: %s.'\
-                     % re.args[1]
+                msg = _("Failed to delete share: %s") % re.args[1]
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
                 self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
             except Exception, ex:
-                msg = 'Failed to delete share: %s.' % str(ex)
+                msg = _("Failed to delete share: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -1093,9 +1066,9 @@ Please check your network connection.''',
     def update_share_callback(self, share):
         try:
             self.pipe_manager.modify_share(share)
-            self.set_status("Share \'%s\' Modified." % share.name)
+            self.set_status(_("Share '%s' Modified") % share.name)
         except RuntimeError, re:
-            msg = 'Failed to Modify Share: %s.' % re.args[1]
+            msg = _("Failed to Modify Share: %s") % re.args[1]
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1103,7 +1076,7 @@ Please check your network connection.''',
                                         Gtk.ButtonsType.OK, msg)
         except Exception, ex:
 
-            msg = 'Failed to Modify Share: %s.' % str(ex)
+            msg = _("Failed to Modify Share: %s") % str(ex)
             print msg
             self.set_status(msg)
             traceback.print_exc()
@@ -1116,15 +1089,14 @@ Please check your network connection.''',
         try:
             self.pipe_manager.get_shares_list()
         except RuntimeError, re:
-            msg = 'Failed to Refresh SRV Info: %s.'\
-                 % re.args[1]
+            msg = _("Failed to Refresh SRV Info: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
         except Exception, ex:
-            msg = 'Failed to Refresh SRV Info: %s.' % str(ex)
+            msg = _("Failed to Refresh SRV Info: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -1132,10 +1104,9 @@ Please check your network connection.''',
                                         Gtk.ButtonsType.OK, msg)
 
         self.refresh_shares_view()
-        self.set_status('Successfully Refreshed Shares List.')
+        self.set_status(_("Successfully Refreshed Shares List"))
 
-        (model, iter) = \
-            self.shares_tree_view.get_selection().get_selected()
+        (model, iter) = self.shares_tree_view.get_selection().get_selected()
         if iter is None:
             return
         selector = self.shares_tree_view.get_selection()
@@ -1146,11 +1117,11 @@ Please check your network connection.''',
             return
 
         if event.type == Gdk.EventType._2BUTTON_PRESS:
-            self.on_edit_item_activate(self.edit_item)
+            self.on_edit_item_activate(self.edit_button)
 
     def on_self_delete(self, widget, event):
         if self.pipe_manager is not None:
-            self.on_disconnect_item_activate(self.disconnect_item)
+            self.on_disconnect_item_activate(self.disconnect_button)
 
         Gtk.main_quit()
         return False
@@ -1159,15 +1130,13 @@ Please check your network connection.''',
         if not self.connected():
             return None
 
-        (model, paths) = \
-            self.shares_tree_view.get_selection().get_selected_rows()
+        model, paths = self.shares_tree_view.get_selection().get_selected_rows()
         self.pipe_manager.get_shares_list()
 
         self.shares_store.clear()
         for share in self.pipe_manager.share_list:
-            type_comment = \
-                self.pipe_manager.get_share_type_info(share.type, 'desc'
-                    )
+            type_comment = self.pipe_manager.get_share_type_info(share.type,
+                                                                'desc')
             view_compat_data = [share.name, type_comment,
                                 share.comment, share.path]
             self.shares_store.append(view_compat_data)
@@ -1190,20 +1159,20 @@ Please check your network connection.''',
             grid = Gtk.Grid()
             grid.set_border_width(5)
             self.active_pane_frame_label.set_markup(
-                                        '<b> No Share Selected </b>')
+                                        _("<b> No Share Selected </b>"))
 
-            label = Gtk.Label('Please Select a Share First',
+            label = Gtk.Label(_("Please Select a Share First"),
                                             xalign=1, yalign=0.5)
             grid.attach(label, 0, 0, 1, 1)
 
+            # TODO What's this?
             label = Gtk.Label(' ' * 55, xalign=1, yalign=0.5)
             grid.attach(label, 1, 0, 1, 1)
 
         else:
 
             stype = share.type
-            flag_set = self.pipe_manager.get_share_type_info(stype,
-                    'flags')
+            flag_set = self.pipe_manager.get_share_type_info(stype, 'flags')
 
             grid = Gtk.Grid()
             grid.set_border_width(5)
@@ -1213,66 +1182,59 @@ Please check your network connection.''',
             row_index = 0
 
             self.active_pane_frame_label.set_markup(
-                                    '<b>Selected Share Details</b>')
+                                    _("<b>Selected Share Details</b>"))
 
-            label = Gtk.Label(' Share Name  : ',xalign=1, yalign=0.5 )
+            label = Gtk.Label(_("Share Name:"), xalign=1, yalign=0.5)
             grid.attach(label, 0, row_index, 1, 1)
 
             label = Gtk.Label(share.name ,xalign=0, yalign=0.5)
             grid.attach(label, 1, row_index, 1, 1)
             row_index += 1
 
-            label = Gtk.Label(' Comment  : ',xalign=1, yalign=0.5 )
+            label = Gtk.Label(_("Comment:"), xalign=1, yalign=0.5)
             grid.attach(label, 0, row_index, 1, 1)
 
-            label = Gtk.Label(share.comment ,xalign=0, yalign=0.5)
+            label = Gtk.Label(share.comment, xalign=0, yalign=0.5)
             grid.attach(label, 1, row_index, 1, 1)
             row_index += 1
 
 
-            label = Gtk.Label(' Path  : ',xalign=1, yalign=0.5 )
+            label = Gtk.Label(_("Path:"), xalign=1, yalign=0.5 )
             grid.attach(label, 0, row_index, 1, 1)
 
             label = Gtk.Label(share.path ,xalign=0, yalign=0.5)
             grid.attach(label, 1, row_index, 1, 1)
             row_index += 1
 
-
-
-
             if share.password:
-                label = Gtk.Label(' Password  : ',xalign=1, yalign=0.5 )
+                label = Gtk.Label(_("Password:"), xalign=1, yalign=0.5)
                 grid.attach(label, 0, row_index, 1, 1)
 
-                label = Gtk.Label('Protection Enabled' ,
-                                                xalign=0, yalign=0.5)
+                label = Gtk.Label(_("Protection Enabled"), xalign=0, yalign=0.5)
                 grid.attach(label, 1, row_index, 1, 1)
                 row_index += 1
 
-            label = Gtk.Label('<b> Share Type</b>',xalign=0, yalign=0.5)
-            label.set_property("use-markup",True)
+            label = Gtk.Label(_("<b> Share Type</b>"), xalign=0, yalign=0.5)
+            label.set_property('use-markup',True)
             grid.attach(label, 0, row_index, 1, 1)
             row_index += 1
 
-            label = Gtk.Label(' Type Description  : ',
-                                            xalign=1, yalign=0.5 )
+            label = Gtk.Label(_("Type Description:"), xalign=1, yalign=0.5)
             grid.attach(label,  0, row_index, 1, 1)
-            label_data = self.pipe_manager.get_share_type_info(
-                                                    stype, 'desc')
-            label = Gtk.Label(label_data ,xalign=0, yalign=0.5)
+            label_data = self.pipe_manager.get_share_type_info(stype, 'desc')
+            label = Gtk.Label(label_data, xalign=0, yalign=0.5)
             grid.attach(label, 1, row_index, 1, 1)
             row_index += 1
 
-            label = Gtk.Label('<b> Special Flags </b>',
-                                                xalign=0, yalign=0.5 )
-            label.set_property("use-markup",True)
+            label = Gtk.Label(_("<b>Special Flags</b>"), xalign=0, yalign=0.5)
+            label.set_property('use-markup', True)
             grid.attach(label,  0, row_index, 1, 1)
             row_index += 1
 
             flags_present = False
             if flag_set[0]:
                 flags_present = True
-                label = Gtk.Label(' Temporary  : ',xalign=1, yalign=0.5)
+                label = Gtk.Label(_("Temporary:"),xalign=1, yalign=0.5)
                 grid.attach(label,  0, row_index, 1, 1)
 
                 label = Gtk.Label(str(flag_set[0]),xalign=0, yalign=0.5)
@@ -1281,21 +1243,20 @@ Please check your network connection.''',
 
             if flag_set[1]:
                 flags_present = True
-                label = Gtk.Label(' Hidden  : ',xalign=1, yalign=0.5)
+                label = Gtk.Label(_("Hidden:"), xalign=1, yalign=0.5)
                 grid.attach(label, 0, row_index, 1, 1)
 
-                label = Gtk.Label(str(flag_set[1]),xalign=0, yalign=0.5)
+                label = Gtk.Label(str(flag_set[1]), xalign=0, yalign=0.5)
                 grid.attach(label, 1, row_index, 1, 1)
                 row_index += 1
 
             if not flags_present:
-                label = Gtk.Label('No Special Flags',
-                                        xalign=0, yalign=0.5)
+                label = Gtk.Label(_("No Special Flags"), xalign=0, yalign=0.5)
                 grid.attach(label, 1, row_index, 1, 1)
                 row_index += 1
 
             if not share.max_users == 0xFFFFFFFF:
-                label = Gtk.Label(' Max Users  : ',xalign=1, yalign=0.5)
+                label = Gtk.Label(_("Max Users:"), xalign=1, yalign=0.5)
                 grid.attach(label, 0, row_index, 1, 1)
 
                 label = Gtk.Label(share.max_users ,xalign=0, yalign=0.5)
@@ -1308,148 +1269,62 @@ Please check your network connection.''',
     def create(self):
 
         # main window
-        self.set_title('Samba-Gtk Share Management Interface')
+        self.set_title(_("Samba-Gtk Share Management Interface"))
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], 'images'
-                , 'network.png')
-        self.share_icon_filename = os.path.join(sys.path[0],
-                'images', 'network.png')
-        self.icon_pixbuf = \
-            GdkPixbuf.Pixbuf.new_from_file(self.icon_filename)
-        self.set_icon(self.icon_pixbuf)
 
         accel_group = Gtk.AccelGroup()
         toplevel_vbox = Gtk.VBox(False, 0)
         self.add(toplevel_vbox)
 
-        # menu
-        self.menubar = Gtk.MenuBar()
-        toplevel_vbox.pack_start(self.menubar, False, False, 0)
-
-        self.file_item = Gtk.MenuItem.new_with_mnemonic('_File')
-        self.menubar.add(self.file_item)
-
-        file_menu = Gtk.Menu()
-        self.file_item.set_property("submenu",file_menu)
-
-        self.connect_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_CONNECT, accel_group)
-        self.connect_item.set_always_show_image(True)
-        file_menu.add(self.connect_item)
-
-        self.disconnect_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_DISCONNECT, accel_group)
-        self.disconnect_item.set_sensitive(False)
-        self.disconnect_item.set_always_show_image(True)
-        file_menu.add(self.disconnect_item)
-
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        menu_separator_item.set_property("sensitive",False)
-        file_menu.add(menu_separator_item)
-
-        self.quit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_QUIT, accel_group)
-        self.quit_item.set_always_show_image(True)
-        file_menu.add(self.quit_item)
-
-        self.view_item = Gtk.MenuItem.new_with_mnemonic('_View')
-        self.menubar.add(self.view_item)
-
-        view_menu = Gtk.Menu()
-        self.view_item.set_property("submenu",view_menu)
-
-        self.refresh_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_REFRESH, accel_group)
-        self.refresh_item.set_sensitive(False)
-        self.refresh_item.set_always_show_image(True)
-        view_menu.add(self.refresh_item)
-
-        self.share_item = Gtk.MenuItem.new_with_mnemonic('_Share')
-        self.menubar.add(self.share_item)
-
-        share_menu = Gtk.Menu()
-        self.share_item.set_submenu(share_menu)
-
-        self.new_item = Gtk.ImageMenuItem.new_from_stock(
-                                                    Gtk.STOCK_NEW, accel_group)
-        self.new_item.set_sensitive(False)
-        self.new_item.set_always_show_image(True)
-        share_menu.add(self.new_item)
-
-        self.delete_item = Gtk.ImageMenuItem.new_from_stock(
-                                                 Gtk.STOCK_DELETE, accel_group)
-        self.delete_item.set_sensitive(False)
-        self.delete_item.set_always_show_image(True)
-        share_menu.add(self.delete_item)
-
-        self.edit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_EDIT, accel_group)
-        self.edit_item.set_sensitive(False)
-        self.edit_item.set_always_show_image(True)
-        share_menu.add(self.edit_item)
-
-        self.wizard_item = Gtk.MenuItem.new_with_mnemonic('_Wizard')
-        self.menubar.add(self.wizard_item)
-
-        wizard_menu = Gtk.Menu()
-        self.wizard_item.set_property("submenu",wizard_menu)
-
-        self.new_share_wizard_item = \
-            Gtk.MenuItem.new_with_label('New Share Wizard')
-        wizard_menu.add(self.new_share_wizard_item)
-
-        self.help_item = Gtk.MenuItem.new_with_mnemonic('_Help')
-        self.menubar.add(self.help_item)
-
-        help_menu = Gtk.Menu()
-        self.help_item.set_property("submenu",help_menu)
-
-        self.about_item = Gtk.ImageMenuItem.new_from_stock(
-                                                  Gtk.STOCK_ABOUT, accel_group)
-        self.about_item.set_always_show_image(True)
-        help_menu.add(self.about_item)
-
         # Toolbar
-        self.toolbar = Gtk.Toolbar()
-        toplevel_vbox.pack_start(self.toolbar, False, False, 0)
+        self.toolbar = build_toolbar(self, toplevel_vbox)
 
         self.connect_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
-        self.connect_button.set_is_important(True)
-        self.connect_button.set_tooltip_text('Connect to a server')
-        self.toolbar.insert(self.connect_button, 0)
+        self.connect_button.set_tooltip_text(_("Connect to a server"))
+        self.toolbar.add(self.connect_button)
 
         self.disconnect_button = Gtk.ToolButton.new_from_stock(
                                                          Gtk.STOCK_DISCONNECT)
-        self.disconnect_button.set_is_important(True)
-        self.disconnect_button.set_tooltip_text('Disconnect from the server')
-        self.toolbar.insert(self.disconnect_button, 1)
+        self.disconnect_button.set_tooltip_text(_("Disconnect from the server"))
+        self.toolbar.add(self.disconnect_button)
+        
+        self.refresh_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_REFRESH)
+        self.refresh_button.set_tooltip_text(_("Reload content from server"))
+        self.toolbar.add(self.refresh_button)
 
-        sep = Gtk.SeparatorToolItem()
-        self.toolbar.insert(sep, 2)
+        self.toolbar.add(Gtk.SeparatorToolItem())
 
-        self.new_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_NEW)
-        self.new_button.set_is_important(True)
-        self.new_button.set_tooltip_text('Add a new Share')
-        self.toolbar.insert(self.new_button, 3)
+        self.new_button = Gtk.MenuToolButton.new(None, _("Add Share"))
+        self.new_button.set_icon_name('list-add')
+        self.new_button.set_tooltip_text(_("Add a new Share"))
+        self.toolbar.add(self.new_button)
+        wizard_menu = Gtk.Menu()
 
-        self.edit_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_EDIT)
-        self.edit_button.set_is_important(True)
-        self.edit_button.set_tooltip_text('Edit a Share')
-        self.toolbar.insert(self.edit_button, 4)
+        self.new_share_wizard_item = Gtk.MenuItem.new_with_label(
+                                            _("New Share Wizard"))
+        wizard_menu.add(self.new_share_wizard_item)
 
-        self.delete_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_DELETE)
-        self.delete_button.set_is_important(True)
-        self.delete_button.set_tooltip_text('Delete a Share')
-        self.toolbar.insert(self.delete_button, 5)
+        wizard_menu.show_all()
+        self.new_button.set_menu(wizard_menu)
 
-        sep = Gtk.SeparatorToolItem()
-        self.toolbar.insert(sep, 6)
+        self.edit_button = Gtk.ToolButton.new(None, _("Edit Share"))
+        self.edit_button.set_icon_name('edit')
+        self.edit_button.set_tooltip_text(_("Edit selected Share"))
+        self.toolbar.add(self.edit_button)
 
-        self.new_share_wizard_button = Gtk.ToolButton.new_from_stock(
-                                                            Gtk.STOCK_EXECUTE)
-        self.new_share_wizard_button.set_is_important(True)
-        self.new_share_wizard_button.set_tooltip_text('New Share Wizard')
-        self.toolbar.insert(self.new_share_wizard_button, 7)
+        self.delete_button = Gtk.ToolButton.new(None, _("Delete Share"))
+        self.delete_button.set_icon_name(_("list-remove"))
+        self.delete_button.set_tooltip_text(_("Delete selected Share"))
+        self.toolbar.add(self.delete_button)
+
+        self.toolbar.add(Gtk.SeparatorToolItem())
+        
+        self.about_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
+        self.about_button.set_tooltip_text(_("About GWShare..."))
+        if hasattr(self.toolbar, 'pack_end'):
+            self.toolbar.pack_end(self.about_button)
+        else:
+            self.toolbar.add(self.about_button)
 
         # Share-page
         self.portablity_box = Gtk.VBox()
@@ -1459,14 +1334,14 @@ Please check your network connection.''',
 
         main_vbox = Gtk.VBox()
         self.share_notebook.append_page(main_vbox,
-                Gtk.Label('Share Management'))
+                        Gtk.Label(_("Share Management")))
 
         # Share listing
         rvbox = Gtk.VBox()
         main_vbox.pack_start(rvbox, True, True, 0)
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
-        scrolledwindow.set_property("shadow_type",Gtk.ShadowType.IN)
+        scrolledwindow.set_property('shadow_type',Gtk.ShadowType.IN)
 
         rvbox.pack_start(scrolledwindow, True, True, 2)
 
@@ -1476,14 +1351,12 @@ Please check your network connection.''',
         column = Gtk.TreeViewColumn()
         column.set_title('')
         renderer = Gtk.CellRendererPixbuf()
-        renderer.set_property('pixbuf',
-                              GdkPixbuf.Pixbuf.new_from_file_at_size(
-                              self.share_icon_filename,22, 22))
+        renderer.set_property('icon-name', 'folder-remote')
         column.pack_start(renderer, True)
         self.shares_tree_view.append_column(column)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Name')
+        column.set_title(_("Name"))
         column.set_resizable(True)
         column.set_sort_column_id(0)
         renderer = Gtk.CellRendererText()
@@ -1492,7 +1365,7 @@ Please check your network connection.''',
         column.add_attribute(renderer, 'text', 0)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Share Type')
+        column.set_title(_("Share Type"))
         column.set_resizable(True)
         column.set_sort_column_id(1)
         renderer = Gtk.CellRendererText()
@@ -1501,7 +1374,7 @@ Please check your network connection.''',
         column.add_attribute(renderer, 'text', 1)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Comment')
+        column.set_title(_("Comment"))
         column.set_resizable(True)
         column.set_sort_column_id(2)
         renderer = Gtk.CellRendererText()
@@ -1510,7 +1383,7 @@ Please check your network connection.''',
         column.add_attribute(renderer, 'text', 2)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Path')
+        column.set_title(_("Path"))
         column.set_resizable(True)
         column.set_sort_column_id(3)
         renderer = Gtk.CellRendererText()
@@ -1521,20 +1394,17 @@ Please check your network connection.''',
         self.shares_store = Gtk.ListStore(GObject.TYPE_STRING,
                 GObject.TYPE_STRING, GObject.TYPE_STRING,
                 GObject.TYPE_STRING)
-        self.shares_store.set_sort_column_id(0,
-                Gtk.SortType.ASCENDING)
+        self.shares_store.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         self.shares_tree_view.set_model(self.shares_store)
 
         hbox = Gtk.HBox()
         rvbox.pack_start(hbox, False, False, 0)
 
-        self.show_all_share_checkbox = \
-            Gtk.CheckButton('Show Hidden Shares')
+        self.show_all_share_checkbox = Gtk.CheckButton(_("Show Hidden Shares"))
         self.show_all_share_checkbox.set_active(False)
         self.show_all_share_checkbox.set_tooltip_text(
-                    'Enable or disable the visiblity of hidden shares')
-        hbox.pack_end(self.show_all_share_checkbox, False, False,
-                      0)
+                    _("Enable or disable the visiblity of hidden shares"))
+        hbox.pack_end(self.show_all_share_checkbox, False, False, 2)
         self.show_all_share_checkbox.connect('toggled',
                 self.toggle_share_view_visiblity, None)
 
@@ -1546,13 +1416,12 @@ Please check your network connection.''',
 
         self.shareinfo_frame = Gtk.Frame()
         self.active_pane_frame_label = Gtk.Label(
-                                        '<b> No Share Selected </b>')
-        self.active_pane_frame_label.set_property("use-markup",True)
+                                        _("<b> No Share Selected </b>"))
+        self.active_pane_frame_label.set_property('use-markup', True)
 
-        self.shareinfo_frame.set_label_widget(
-                                        self.active_pane_frame_label)
+        self.shareinfo_frame.set_label_widget(self.active_pane_frame_label)
         vbox.pack_start(self.shareinfo_frame, False, True, 0)
-        self.shareinfo_frame.set_property("border-width",5)
+        self.shareinfo_frame.set_property('border-width', 5)
 
         grid = Gtk.Grid()
         grid.set_border_width(5)
@@ -1561,12 +1430,10 @@ Please check your network connection.''',
 
         self.shareinfo_frame.add(grid)
 
-        label = Gtk.Label('Please Slect a Share First',
-                        xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Please Slect a Share First"), xalign=1,yalign=0.5)
         grid.attach(label, 0, 0, 1, 1)
 
-        label = Gtk.Label(' '*55,
-                        xalign=1,yalign=0.5)
+        label = Gtk.Label(' '*55, xalign=1,yalign=0.5) # TODO What's this for?
         grid.attach(label, 1, 0, 1, 1)
 
 
@@ -1580,18 +1447,17 @@ Please check your network connection.''',
         #for uniformity of spacing
         grid.attach(Gtk.Label(""),0,1,1,1)
 
-        self.active_frame_new_button = Gtk.Button('New')
-        self.active_frame_new_button.set_tooltip_text('Add a New Share')
+        self.active_frame_new_button = Gtk.Button(_("New"))
+        self.active_frame_new_button.set_tooltip_text(_("Add a New Share"))
         grid.attach(self.active_frame_new_button, 1, 1, 1, 1)
 
-        self.active_frame_edit_button = Gtk.Button('Edit')
-        self.active_frame_edit_button.set_tooltip_text(
-                                                'Edit Current Share')
+        self.active_frame_edit_button = Gtk.Button(_("Edit"))
+        self.active_frame_edit_button.set_tooltip_text(_("Edit Current Share"))
         grid.attach(self.active_frame_edit_button,  2, 1, 1, 1)
 
-        self.active_frame_delete_button = Gtk.Button('Delete')
+        self.active_frame_delete_button = Gtk.Button(_("Delete"))
         self.active_frame_delete_button.set_tooltip_text(
-                                                'Delete Current Share')
+                                                _("Delete Current Share"))
         grid.attach(self.active_frame_delete_button, 3, 1, 1, 1)
         grid.attach(Gtk.Label(""),4,1,1,1)
 
@@ -1599,16 +1465,15 @@ Please check your network connection.''',
 
         # Server Info Page
         hbox = Gtk.HBox(True)
-        self.share_notebook.append_page(hbox,
-                Gtk.Label('Share Server Info'))
+        self.share_notebook.append_page(hbox, Gtk.Label(_("Share Server Info")))
 
         vbox = Gtk.VBox()
         hbox.pack_start(vbox, True, True, 0)
 
         self.srvinfo_frame = Gtk.Frame()
-        self.srv_info_label = Gtk.Label('<b>Share Server Details</b>')
-        self.srv_info_label.set_property("use-markup",True)
-        self.srvinfo_frame.set_property("border-width",5)
+        self.srv_info_label = Gtk.Label(_("<b>Share Server Details</b>"))
+        self.srv_info_label.set_property('use-markup', True)
+        self.srvinfo_frame.set_property('border-width', 5)
         self.srvinfo_frame.set_label_widget(self.srv_info_label)
         vbox.pack_start(self.srvinfo_frame, False, True, 0)
 
@@ -1619,61 +1484,61 @@ Please check your network connection.''',
 
         self.srvinfo_frame.add(grid)
 
-        label = Gtk.Label(' Target Platform OS  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Target Platform OS:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 0, 1, 1)
 
-        self.srvinfo_tos_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_tos_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_tos_label, 1, 0, 1, 1)
 
-        label = Gtk.Label(' NetBIOS Name : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("NetBIOS Name:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 1, 1, 1)
 
-        self.srvinfo_name_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_name_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_name_label, 1, 1, 1, 1)
 
-        label = Gtk.Label(' Hidden  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Hidden:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 2, 1, 1)
 
-        self.srvinfo_hidden_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_hidden_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_hidden_label, 1, 2, 1, 1)
 
-        label = Gtk.Label(' Comment  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Comment:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 3, 1, 1)
 
-        self.srvinfo_comment_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_comment_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_comment_label, 1, 3, 1, 1)
 
-        label = Gtk.Label(' Version : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Version:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 4, 1, 1)
 
         self.srvinfo_version_label = Gtk.Label(xalign=0,yalign=0.5)
         grid.attach(self.srvinfo_version_label, 1, 4, 1, 1)
 
-        label = Gtk.Label(' Server Type  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Server Type:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 5, 1, 1)
 
         self.srvinfo_type_label = Gtk.Label(xalign=0,yalign=0.5)
         grid.attach(self.srvinfo_type_label, 1, 5, 1, 1)
 
 
-        label = Gtk.Label(' User Path  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("User Path:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 6, 1, 1)
 
         self.srvinfo_upath_label = Gtk.Label(xalign=0,yalign=0.5)
         grid.attach(self.srvinfo_upath_label, 1, 6, 1, 1)
 
 
-        label = Gtk.Label(' Timeout  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Timeout:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 7, 1, 1)
 
-        self.srvinfo_to_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_to_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_to_label, 1, 7, 1, 1)
 
 
-        label =Gtk.Label(' Announce / Anndelta  : ',xalign=1,yalign=0.5)
+        label = Gtk.Label(_("Announce/Anndelta:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 8, 1, 1)
 
-        self.srvinfo_aa_label = Gtk.Label(xalign=0,yalign=0.5)
+        self.srvinfo_aa_label = Gtk.Label(xalign=0, yalign=0.5)
         grid.attach(self.srvinfo_aa_label, 1, 8, 1, 1)
 
 
@@ -1681,8 +1546,8 @@ Please check your network connection.''',
         hbox.pack_start(vbox, True, True, 0)
 
         self.sd_frame = Gtk.Frame()
-        label = Gtk.Label('<b> Shared Disks </b>')
-        label.set_property("use-markup",True)
+        label = Gtk.Label(_("<b> Shared Disks </b>"))
+        label.set_property('use-markup', True)
 
         self.sd_frame.set_label_widget(label),
         self.sd_frame.set_border_width(5)
@@ -1691,7 +1556,6 @@ Please check your network connection.''',
         # status bar
 
         self.statusbar = Gtk.Statusbar()
-        #self.statusbar.set_property("has-resize-grip",True)
         toplevel_vbox.pack_start(self.statusbar, False, False, 0)
 
         # signals/events
@@ -1699,27 +1563,17 @@ Please check your network connection.''',
         self.connect('delete_event', self.on_self_delete)
         self.connect('key-press-event', self.on_key_press)
 
-        self.connect_item.connect('activate',self.on_connect_item_activate)
-        self.disconnect_item.connect('activate',
-                                    self.on_disconnect_item_activate)
-        self.quit_item.connect('activate', self.on_quit_item_activate)
-        self.refresh_item.connect('activate',self.on_refresh_item_activate)
-        self.about_item.connect('activate', self.on_about_item_activate)
-
-        self.new_item.connect('activate', self.on_new_item_activate)
-        self.delete_item.connect('activate',self.on_delete_item_activate)
-        self.edit_item.connect('activate', self.on_edit_item_activate)
         self.new_share_wizard_item.connect('activate',
                                           self.on_new_item_activate, True)
 
         self.connect_button.connect('clicked',self.on_connect_item_activate)
         self.disconnect_button.connect('clicked',
                                       self.on_disconnect_item_activate)
+        self.refresh_button.connect('clicked', self.on_refresh_item_activate)
         self.new_button.connect('clicked', self.on_new_item_activate)
         self.delete_button.connect('clicked',self.on_delete_item_activate)
         self.edit_button.connect('clicked', self.on_edit_item_activate)
-        self.new_share_wizard_button.connect('clicked',
-                                        self.on_new_item_activate, True)
+        self.about_button.connect('clicked', self.on_about_item_activate)
 
         self.active_frame_new_button.connect('clicked',
                                             self.on_new_item_activate)
@@ -1740,20 +1594,21 @@ Please check your network connection.''',
 
         self.add_accel_group(accel_group)
 
-############################################################################################################
+###############################################################################
 
 
 def PrintUsage():
     print 'Usage: %s [OPTIONS]'\
          % str(os.path.split(__file__)[-1])
-    print 'All options are optional. The user will be queried for additional information if needed.\n'
+    print 'All options are optional. '
+    print 'The user will be queried for additional information if needed.\n'
     print '  -s  --server\t\tspecify the server to connect to.'
     print '  -u  --user\t\tspecify the username.'
     print '  -p  --password\tThe password for the user.'
-    print '''  -t  --transport\tTransport type.
-\t\t\t\t0 for RPC, SMB, TCP/IP
-\t\t\t\t1 for RPC, TCP/IP
-\t\t\t\t2 for localhost.'''
+    print '  -t  --transport\tTransport type.'
+    print '\t\t\t\t0 for RPC, SMB, TCP/IP'
+    print '\t\t\t\t1 for RPC, TCP/IP'
+    print '\t\t\t\t2 for localhost.'
     print '  -c  --connect-now\tSkip the connect dialog.'
 
 

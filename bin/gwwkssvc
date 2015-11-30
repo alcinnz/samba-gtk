@@ -30,18 +30,18 @@ from samba import credentials
 from samba.dcerpc import wkssvc,security
 
 from sambagtk.wkssvc import (wkssvcConnectDialog , DeleteDialog)
-
+from sambagtk.dialogs import AboutDialog
+from sambagtk.moderngtk import build_toolbar
 
 import sys
 import os.path
 import traceback
 import getopt
-from gi.repository import Gtk
-from gi.repository import GdkPixbuf
-from gi.repository import Gdk
-from gi.repository import GObject
+import gettext
+gettext.install('gwwkssvc')
+from gi.repository import Gtk, GdkPixbuf, Gdk, GObject, GLib
 
-class wkssvcPipeManager()
+class wkssvcPipeManager(object):
 
     def __init__(self, server_address, transport_type, username,
                     password):
@@ -65,8 +65,7 @@ class wkssvcPipeManager()
         if transport_type is 2:
             server_address = '127.0.0.1'
 
-        self.pipe = wkssvc.wkssvc(binding % server_address,
-                                  credentials=creds)
+        self.pipe = wkssvc.wkssvc(binding % server_address, credentials=creds)
 
         # set up some basic parameters unique to the connection
 
@@ -75,7 +74,8 @@ class wkssvcPipeManager()
         # Determine if the server is local
         if server_address in ('127.0.0.1', 'localhost'):
             self.islocal = True
-        # Not really necessary from the point of view of the pipe itself but later sections depend on it
+        # Not really necessary from the point of view of the pipe itself
+        # but later sections depend on it
         else:
             self.islocal = False
 
@@ -120,7 +120,7 @@ class wkssvcPipeManager()
             0x00000258: {'typestring': 'PLATFORM_ID_OSF', 'desc': 'OSF/1'},
             0x000002BC: {'typestring': 'PLATFORM_ID_VMS', 'desc': 'VMS'},
             }
-        return os_dict.get(platform_id).get(field,'Unknown')
+        return os_dict.get(platform_id).get(field, _("Unknown"))
 
     def get_users_list(self):
         """
@@ -131,18 +131,22 @@ class wkssvcPipeManager()
         """
         self.current_users_list = []
         info_ctr = wkssvc.NetWkstaEnumUsersInfo()
-        info_ctr.level = 1 #TODO : Figure out if level 1 can be used, it provides a lot of necesaary user information Code seems implemented .
+        # TODO: Figure out if level 1 can be used,
+        #       it provides a lot of necessary user information
+        #       Code seems implemented.
+        info_ctr.level = 1
 
         (info_ctr, totalentries, self.resume_handle_users) = \
             self.pipe.NetWkstaEnumUsers(self.server_unc, info_ctr,
-                                   prefmaxlen #TODO:  Figure out this particular value
-                                   self.resume_handle_users)
+                                    # TODO:  Figure out this particular value
+                                    prefmaxlen,
+                                    self.resume_handle_users)
         if totalentries != 0:
             self.current_users_list = info_ctr.ctr.array
 
     @staticmethod
     def get_encrypted_password_buff(password):
-        #TODO : this logic nees to be implemented.
+        #TODO : this logic needs to be implemented.
         pass
 
     def join_domain(self, server_address, domain_name, machine_name,
@@ -171,7 +175,7 @@ class wkssvcPipeManager()
 
 
 
-class WkssvcWindow(Gtk.Window)
+class WkssvcWindow(Gtk.Window):
 
     def __init__(self, info_callback=None, server='', username='',
                  password='', transport_type=0, connect_now=False):
@@ -186,7 +190,7 @@ class WkssvcWindow(Gtk.Window)
         self.server_info = None
 
         self.create()
-        self.set_status('Disconnected.')
+        self.set_status(_("Disconnected"))
         self.on_connect_item_activate(None, server, transport_type,
                                         username, password, connect_now)
         self.show_all()
@@ -234,12 +238,12 @@ class WkssvcWindow(Gtk.Window)
                 self.wkst_info = self.pipe_manager.get_workstation_info()
 
                 self.set_status(
-                          'Connected to Server: IP=%s NETBios Name=%s.'
-                           % (self.server_address,
-                            self.wkst_info.server_name))
+                            _("Connected to Server: IP=%s NETBios Name=%s") % (
+                                    self.server_address,
+                                    self.wkst_info.server_name))
         except RuntimeError, re:
 
-            msg = 'Failed to connect: %s.' % re.args[1]
+            msg = _("Failed to connect: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -247,7 +251,7 @@ class WkssvcWindow(Gtk.Window)
                                 Gtk.ButtonsType.OK, msg)
         except Exception, ex:
 
-            msg = 'Failed to connect: %s.' % str(ex)
+            msg = _("Failed to connect: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -259,7 +263,7 @@ class WkssvcWindow(Gtk.Window)
     def run_connect_dialog(self, pipe_manager, server_address,
             transport_type, username, password, connect_now=False):
 
-        dialog = srvsvcConnectDialog(server_address, transport_type,
+        dialog = wkssvcConnectDialog(server_address, transport_type,
                 username, password)
         dialog.show_all()
 
@@ -288,50 +292,47 @@ class WkssvcWindow(Gtk.Window)
                     break
                 except RuntimeError, re:
 
-                    if re.args[1] == 'Logon failure':  # user got the password wrong
+                    # User got the password wrong
+                    if re.args[1] == 'Logon failure':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Invalid username or password.'
-                                , dialog)
+                                _("Failed to connect: "
+                                    "Invalid username or password."),
+                                dialog)
                         dialog.password_entry.grab_focus()
-                        dialog.password_entry.select_region(0,
-                                -1)  # select all the text in the password box
-                    elif re.args[0] == 5 or re.args[1]\
-                         == 'Access denied':
+                        # Select all the text in the password box
+                        dialog.password_entry.select_region(0, -1)
+                    elif re.args[0] == 5 or re.args[1] == 'Access denied':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Access Denied.',
+                                _("Failed to connect: Access Denied."),
                                 dialog)
                         dialog.username_entry.grab_focus()
-                        dialog.username_entry.select_region(0,
-                                -1)
-                    elif re.args[1]\
-                         == 'NT_STATUS_HOST_UNREACHABLE':
+                        dialog.username_entry.select_region(0, -1)
+                    elif re.args[1] == 'NT_STATUS_HOST_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                'Failed to connect: Could not contact the server'
-                                , dialog)
+                                _("Failed to connect: "
+                                    "Could not contact the server"),
+                                dialog)
                         dialog.server_address_entry.grab_focus()
-                        dialog.server_address_entry.select_region(0,
-                                -1)
-                    elif re.args[1]\
-                         == 'NT_STATUS_NETWORK_UNREACHABLE':
+                        dialog.server_address_entry.select_region(0, -1)
+                    elif re.args[1] == 'NT_STATUS_NETWORK_UNREACHABLE':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
-                                '''Failed to connect: The network is unreachable.
-
-Please check your network connection.''',
+                                _("Failed to connect: "
+                                    "The network is unreachable.\n\n"
+                                    "Please check your network connection."),
                                 dialog)
                     else:
-                        msg = 'Failed to connect: %s.'\
-                             % re.args[1]
+                        msg = _("Failed to connect: %s.") % re.args[1]
                         print msg
                         traceback.print_exc()
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK, msg, dialog)
                 except Exception, ex:
 
-                    msg = 'Failed to connect: %s.' % str(ex)
+                    msg = _("Failed to connect: %s") % str(ex)
                     print msg
                     traceback.print_exc()
                     self.run_message_dialog(Gtk.MessageType.ERROR,
@@ -347,10 +348,9 @@ Please check your network connection.''',
 
     def on_about_item_activate(self, widget):
         dialog = AboutDialog('PyGWWkssvc',
-                             "A tool to manage domains and workstations.\nBased on Jelmer Vernooij's original Samba-GTK"
-                             , self.icon_pixbuf)
-        dialog.set_copyright('Copyright \xc2\xa9 2011 Dhananjay Sathe <dhananjaysathe@gmail.com>'
-                             )
+                             _("A tool to manage domains and workstations.\n"
+                                "Based on Jelmer Vernooij's original Samba-GTK"),
+                             'samba-gwwkssvc')
         dialog.run()
         dialog.hide()
 
@@ -359,15 +359,9 @@ Please check your network connection.''',
         connected = self.pipe_manager is not None
         selected = self.get_selected_domain() is not None
 
-        self.connect_item.set_sensitive(not connected)
-        self.disconnect_item.set_sensitive(connected)
-        self.refresh_item.set_sensitive(connected)
-
-        self.join_domain_item.set_sensitive(connected)
-        self.unjoin_domain_item.set_sensitive(connected and selected)
-
         self.connect_button.set_sensitive(not connected)
         self.disconnect_button.set_sensitive(connected)
+        self.refresh_button.set_sensitive(connected)
 
         self.join_domain_button.set_sensitive(connected)
         self.unjoin_domain_button.set_sensitive(connected and selected)
@@ -378,7 +372,7 @@ Please check your network connection.''',
 
     def on_refresh_item_activate(self, widget):
         self.refresh_domains_view()
-        self.set_status('Successfully Refreshed Domains List.')
+        self.set_status(_("Successfully Refreshed Domains List"))
 
 
 
@@ -413,7 +407,7 @@ Please check your network connection.''',
         self.pipe_manager.join_domian()
 
         if required_data is None:
-            self.set_status('Join canceled.')
+            self.set_status(_("Join canceled"))
             return
 
         try:
@@ -422,17 +416,17 @@ Please check your network connection.''',
                                         required_data.get(machine_name),
                                         required_data.get(username),
                                         required_data.get(password))
-            self.set_status("Successfully joined domian \'%s\'."
+            self.set_status(_("Successfully joined domian '%s'")
                              % required_data.get(domain_name))
         except RuntimeError, re:
-            msg = 'Failed to join domian: %s.' % re.args[1]
+            msg = _("Failed to join domian: %s") % re.args[1]
             self.set_status(msg)
             print msg
             traceback.print_exc()
             self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
         except Exception, ex:
-            msg = 'Failed to join domain: %s.' % str(ex)
+            msg = _("Failed to join domain: %s") % str(ex)
             self.set_status(msg)
             print msg
             traceback.print_exc()
@@ -461,19 +455,18 @@ Please check your network connection.''',
             try:
                 # TODO : Implement this logic
                 #self.pipe_manager.unjoin_domain()
-                self.set_status("Successfully unjoined domain \'%s\'."
+                self.set_status(_("Successfully unjoined domain '%s'")
                                  % domain_name)
             except RuntimeError, re:
 
-                msg = 'Failed to unjoin domain: %s.'\
-                     % re.args[1]
+                msg = _("Failed to unjoin domain: %s") % re.args[1]
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
                 self.run_message_dialog(Gtk.MessageType.ERROR,
                                         Gtk.ButtonsType.OK, msg)
             except Exception, ex:
-                msg = 'Failed to unjoin domain: %s.' % str(ex)
+                msg = _("Failed to unjoin domain: %s") % str(ex)
                 self.set_status(msg)
                 print msg
                 traceback.print_exc()
@@ -487,8 +480,7 @@ Please check your network connection.''',
         if not self.connected():
             return None
 
-        (model, iter) = \
-            self.domains_tree_view.get_selection().get_selected()
+        (model, iter) = self.domains_tree_view.get_selection().get_selected()
         if iter is None:  # no selection
             return None
         else:
@@ -502,9 +494,6 @@ Please check your network connection.''',
             self.wkst_info = None
         self.set_status('Disconnected.')
 
-    def on_quit_item_activate(self, widget):
-        self.on_self_delete(None, None)
-
     def on_key_press(self, widget, event):
         if event.keyval == Gdk.KEY_F5:
             self.on_refresh_item_activate(None)
@@ -513,130 +502,61 @@ Please check your network connection.''',
 
     def on_self_delete(self, widget, event):
         if self.pipe_manager is not None:
-            self.on_disconnect_item_activate(self.disconnect_item)
+            self.on_disconnect_item_activate(self.disconnect_button)
 
         Gtk.main_quit()
         return False
 
     def create(self):
         # main window
-        self.set_title('Samba-Gtk Workstation Management Interface')
+        self.set_title(_("Samba-Gtk Workstation Management Interface"))
         self.set_default_size(800, 600)
-        self.icon_filename = os.path.join(sys.path[0], 'images'
-                , 'network.png')
-        self.icon_pixbuf = \
-            GdkPixbuf.Pixbuf.new_from_file(self.icon_filename)
-        self.set_icon(self.icon_pixbuf)
 
         accel_group = Gtk.AccelGroup()
         toplevel_vbox = Gtk.VBox(False, 0)
         self.add(toplevel_vbox)
 
-         # menu
-        self.menubar = Gtk.MenuBar()
-        toplevel_vbox.pack_start(self.menubar, False, False, 0)
-
-        self.file_item = Gtk.MenuItem.new_with_mnemonic('_File')
-        self.menubar.add(self.file_item)
-
-        file_menu = Gtk.Menu()
-        self.file_item.set_property("submenu",file_menu)
-
-        self.connect_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_CONNECT, accel_group)
-        self.connect_item.set_always_show_image(True)
-        file_menu.add(self.connect_item)
-
-        self.disconnect_item = Gtk.ImageMenuItem.new_from_stock(
-                                             Gtk.STOCK_DISCONNECT, accel_group)
-        self.disconnect_item.set_sensitive(False)
-        self.disconnect_item.set_always_show_image(True)
-        file_menu.add(self.disconnect_item)
-
-        menu_separator_item = Gtk.SeparatorMenuItem()
-        menu_separator_item.set_property("sensitive",False)
-        file_menu.add(menu_separator_item)
-
-        self.quit_item = Gtk.ImageMenuItem.new_from_stock(
-                                                   Gtk.STOCK_QUIT, accel_group)
-        self.quit_item.set_always_show_image(True)
-        file_menu.add(self.quit_item)
-
-        self.view_item = Gtk.MenuItem.new_with_mnemonic('_View')
-        self.menubar.add(self.view_item)
-
-        view_menu = Gtk.Menu()
-        self.view_item.set_property("submenu",view_menu)
-
-        self.refresh_item = Gtk.ImageMenuItem.new_from_stock(
-                                                Gtk.STOCK_REFRESH, accel_group)
-        self.refresh_item.set_sensitive(False)
-        self.refresh_item.set_always_show_image(True)
-        view_menu.add(self.refresh_item)
-
-        self.joins_item = Gtk.MenuItem.new_with_mnemonic('_Joins')
-        self.menubar.add(self.joins_item)
-
-        joins_menu = Gtk.Menu()
-        self.joins_item.set_submenu(joins_menu)
-
-        self.join_domain_item = Gtk.ImageMenuItem.new_from_stock(
-                                                    Gtk.STOCK_CONNECT, accel_group)
-        self.join_domain_item.set_sensitive(False)
-        self.join_domain_item.set_always_show_image(True)
-        joins_menu.add(self.join_domain_item)
-
-        self.unjoin_domain_item = Gtk.ImageMenuItem.new_from_stock(
-                                                 Gtk.STOCK_DISCONNECT, accel_group)
-        self.unjoin_domain_item.set_sensitive(False)
-        self.unjoin_domain_item.set_always_show_image(True)
-        joins_menu.add(self.unjoin_domain_item)
-
-        self.help_item = Gtk.MenuItem.new_with_mnemonic('_Help')
-        self.menubar.add(self.help_item)
-
-        help_menu = Gtk.Menu()
-        self.help_item.set_property("submenu",help_menu)
-
-        self.about_item = Gtk.ImageMenuItem.new_from_stock(
-                                                  Gtk.STOCK_ABOUT, accel_group)
-        self.about_item.set_always_show_image(True)
-        help_menu.add(self.about_item)
-
         # Toolbar
-        self.toolbar = Gtk.Toolbar()
-        toplevel_vbox.pack_start(self.toolbar, False, False, 0)
+        self.toolbar = build_toolbar(self, toplevel_vbox)
 
         self.connect_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
-        self.connect_button.set_is_important(True)
-        self.connect_button.set_tooltip_text('Connect to a server')
-        self.toolbar.insert(self.connect_button, 0)
+        self.connect_button.set_tooltip_text(_("Connect to a server"))
+        self.toolbar.add(self.connect_button)
 
         self.disconnect_button = Gtk.ToolButton.new_from_stock(
                                                          Gtk.STOCK_DISCONNECT)
-        self.disconnect_button.set_is_important(True)
-        self.disconnect_button.set_tooltip_text('Disconnect from the server')
-        self.toolbar.insert(self.disconnect_button, 1)
+        self.disconnect_button.set_tooltip_text(_("Disconnect from the server"))
+        self.toolbar.add(self.disconnect_button)
+        
+        self.refresh_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_REFRESH)
+        self.refresh_button.set_tooltip_text(_("Reload data from the server"))
+        self.toolbar.add(self.refresh_button)
 
-        sep = Gtk.SeparatorToolItem()
-        self.toolbar.insert(sep, 2)
+        self.toolbar.add(Gtk.SeparatorToolItem())
 
-        self.join_domain_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
-        self.join_domain_button.set_text("Join Domain")
-        self.join_domain_button.set_is_important(True)
-        self.join_domain_button.set_tooltip_text('Join a new Domain')
-        self.toolbar.insert(self.join_domain_button, 3)
+        self.join_domain_button = Gtk.ToolButton.new(None, _("Join Domain"))
+        self.join_domain_button.set_icon_name('document-new')
+        self.join_domain_button.set_tooltip_text(_("Join a new Domain"))
+        self.toolbar.add(self.join_domain_button)
 
-        self.unjoin_domain_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_DISCONNECT)
-        self.unjoin_domain_button.set_text("Unjoin Domain")
-        self.unjoin_domain_button.set_is_important(True)
-        self.unjoin_domain_button.set_tooltip_text('Unjoin Domain')
-        self.toolbar.insert(self.unjoin_domain_button, 4)
+        self.unjoin_domain_button = Gtk.ToolButton.new(None, _("Unjoin Domain"))
+        self.unjoin_domain_button.set_icon_name('edit-delete')
+        self.unjoin_domain_button.set_tooltip_text(_("Unjoin selected domain"))
+        self.toolbar.add(self.unjoin_domain_button)
+        
+        self.toolbar.add(Gtk.SeparatorToolItem())
+        
+        self.about_button = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
+        self.about_button.set_tooltip_text(_("About GWWksSvc..."))
+        if hasattr(self.toolbar, 'pack_end'):
+            self.toolbar.pack_end(self.about_button)
+        else:
+            self.toolbar.add(self.about_button)
 
         # domains list
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
-        scrolledwindow.set_property("shadow_type",Gtk.ShadowType.IN)
+        scrolledwindow.set_property('shadow_type',Gtk.ShadowType.IN)
         toplevel_vbox.pack_start(scrolledwindow, True, True, 0)
 
         self.domains_tree_view = Gtk.TreeView()
@@ -645,14 +565,12 @@ Please check your network connection.''',
         column = Gtk.TreeViewColumn()
         column.set_title('')
         renderer = Gtk.CellRendererPixbuf()
-        renderer.set_property('pixbuf',
-                              GdkPixbuf.Pixbuf.new_from_file_at_size(
-                              self.icon_filename,22, 22))
+        renderer.set_property('icon-name', 'network-workgroup')
         column.pack_start(renderer, True)
         self.domains_tree_view.append_column(column)
 
         column = Gtk.TreeViewColumn()
-        column.set_title('Name')
+        column.set_title(_("Name"))
         column.set_resizable(True)
         column.set_sort_column_id(0)
         renderer = Gtk.CellRendererText()
@@ -672,47 +590,37 @@ Please check your network connection.''',
 
         # signals/events
 
-        self.connect("delete_event", self.on_self_delete)
-        self.connect("key-press-event", self.on_key_press)
+        self.connect('delete_event', self.on_self_delete)
+        self.connect('key-press-event', self.on_key_press)
 
-        self.connect_item.connect("activate", self.on_connect_item_activate)
-        self.disconnect_item.connect("activate",
+        self.connect_button.connect('clicked', self.on_connect_item_activate)
+        self.disconnect_button.connect('clicked',
                                             self.on_disconnect_item_activate)
-        self.quit_item.connect("activate", self.on_quit_item_activate)
-        self.refresh_item.connect("activate", self.on_refresh_item_activate)
+        self.refresh_button.connect('clicked', self.on_refresh_item_activate)
 
-        self.join_domain_item.connect("activate", self.on_join_item_activate)
-        self.unjoin_domain_item.connect("activate",
-                                               self.on_unjoin_item_activate)
+        self.join_domain_button.connect('clicked', self.on_join_item_activate)
+        self.unjoin_domain_button.connect('clicked',self.on_unjoin_item_activate)
+        self.about_button.connect('clicked', self.on_about_item_activate)
 
-        self.about_item.connect("activate", self.on_about_item_activate)
-
-        self.connect_button.connect("clicked", self.on_connect_item_activate)
-        self.disconnect_button.connect("clicked",
-                                            self.on_disconnect_item_activate)
-
-        self.join_domain_button.connect('clicked', self.on_new_item_activate)
-        self.unjoin_domain_button.connect('clicked',self.on_delete_item_activate)
-
-        self.domains_tree_view.get_selection().connect("changed",
+        self.domains_tree_view.get_selection().connect('changed',
                                                 self.on_update_sensitivity)
         self.add_accel_group(accel_group)
 
-############################################################################################################
+###############################################################################
 
 
 def PrintUsage():
-    print 'Usage: %s [OPTIONS]'\
-         % str(os.path.split(__file__)[-1])
-    print 'All options are optional. The user will be queried for additional information if needed.\n'
-    print '  -s  --server\t\tspecify the server to connect to.'
-    print '  -u  --user\t\tspecify the username.'
-    print '  -p  --password\tThe password for the user.'
-    print '''  -t  --transport\tTransport type.
-\t\t\t\t0 for RPC, SMB, TCP/IP
-\t\t\t\t1 for RPC, TCP/IP
-\t\t\t\t2 for localhost.'''
-    print '  -c  --connect-now\tSkip the connect dialog.'
+    print "Usage: %s [OPTIONS]" % str(os.path.split(__file__)[-1])
+    print "All options are optional."
+    print "The user will be queried for additional information if needed.\n"
+    print "  -s  --server\t\tspecify the server to connect to."
+    print "  -u  --user\t\tspecify the username."
+    print "  -p  --password\tThe password for the user."
+    print "  -t  --transport\tTransport type."
+    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
+    print "\t\t\t\t1 for RPC, TCP/IP"
+    print "\t\t\t\t2 for localhost."
+    print "  -c  --connect-now\tSkip the connect dialog."
 
 
 def ParseArgs(argv):
@@ -744,6 +652,7 @@ def ParseArgs(argv):
 
 
 if __name__ == '__main__':
+    GLib.set_prgname('gwwksvc')
     arguments = ParseArgs(sys.argv[1:])
 
     main_window = WkssvcWindow(**arguments)

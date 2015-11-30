@@ -2,8 +2,8 @@
 Name=Windows Job Scheduler
 Comment=View and plan jobs on remote Windows hosts
 Exec=gwcrontab
-Icon=samba
-Terminal=false
+Icon=samba-gwcrontab
 Type=Application
+Terminal=false
 Categories=GNOME;GTK;RemoteAccess;Utility;Network;
 StartupNotify=true
