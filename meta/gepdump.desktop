@@ -7,3 +7,4 @@ Type=Application
 Terminal=false
 Categories=GNOME;GTK;RemoteAccess;Profiling;Utility;Network;Development;
 StartupNotify=true
+Hidden=true
