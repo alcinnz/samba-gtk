@@ -98,70 +98,77 @@ class Task(object):
 
     def get_scheduled_description(self):
         if (self.days_of_week == 0x00 and self.days_of_month == 0x00000000):
-            return "Not scheduled."
+            return _("Not scheduled")
 
         (hour, minutes, seconds) = self.get_time()
         index = self.get_scheduled_index()
 
-        at_str = "%02d:%02d" % (hour, minutes)
+        # TRANSLATORS: This is an hours:minutes time of day. 
+        at_str = _("%02d:%02d") % (hour, minutes)
 
         if (self.run_periodically):
             if (index == 0): # daily schedule
-                every_str = "every day"
+                every_str = _("every day")
             elif (index == 1): # weekly schedule
                 dow_str = ""
+                # TRANSLATORS: This comma seperates days of the week or month
                 for day_no in self.get_scheduled_days_of_week():
                     dow_str += ''.join([Task.get_day_of_week_name(day_no),
-                                        ", "])
+                                        _(", ")])
 
                 # eliminate the last comma
-                dow_str = dow_str.rstrip(", ")
+                dow_str = dow_str.rstrip(_(", "))
 
-                every_str = ' '.join(["every", dow_str, "of every week"])
+                every_str = _("every %s of every week") % dow_str
             else: # monthly schedule
                 dom_str = ""
                 for day_no in self.get_scheduled_days_of_month():
                     dom_str += ''.joinm([Task.get_day_of_month_name(day_no),
-                                        ", "])
+                                        _(", ")])
 
                 # eliminate the last comma
-                dom_str = dom_str.rstrip(", ")
+                dom_str = dom_str.rstrip(_(", "))
 
-                every_str = ' '.join(["every", dom_str, "of every month"])
+                every_str = _("every %s of every month") % dom_str
         else:
             if (index == 0): # daily schedule
-                next_str = "once"
+                next_str = _("once")
             elif (index == 1): # weekly schedule
-                next_str = ' '.join(["next", self.get_day_of_week_name(
-                                        self.get_scheduled_days_of_week()[0])])
+                # TRANSLATORS: This refers to the next day of the week.
+                next_str = _("next %s") % self.get_day_of_week_name(
+                                            self.get_scheduled_days_of_week()[0])
             else:
-                next_str = ' '.join(["next", self.get_day_of_month_name(
-                       self.get_scheduled_days_of_month()[0]), "of the month"])
+                next_str = _("next %s of the month") % (
+                                self.get_day_of_month_name(
+                                        self.get_scheduled_days_of_month()[0]))
 
-        sw_str = ' '.join(["starting with", str(datetime.date.today())])
+        sw_str = _("starting with %s") % str(datetime.date.today())
 
-        if (self.run_periodically):
-            return ''.join(["At ", at_str, ", ", every_str, ", ", sw_str,"."])
+        if self.run_periodically:
+            return _("At {at}, {every}, {sw}").format(at=at_str, every=every_str,
+                                                        sw=sw_str)
         else:
-            return ''.join(["At ", at_str, ", ", next_str, ", ", sw_str, "."])
+            return _("At {at}, {next}, {sw}").format(at=at_str, next=next_str,
+                                                        sw=sw_str)
 
     @staticmethod
     def get_day_of_week_name(day_no):
-        DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday",
-                "Friday", "Saturday", "Sunday"]
+        DAYS_OF_WEEK = [_("Monday"), _("Tuesday"), _("Wednesday"), _("Thursday"),
+                        _("Friday"), _("Saturday"), _("Sunday")]
 
         return DAYS_OF_WEEK[day_no]
 
     @staticmethod
     def get_day_of_month_name(day_no):
+        # TODO This may not internationalize well.
         if day_no == 0:
-            return "1st"
+            return _("1st")
         elif day_no == 1:
-            return "2nd"
+            return _("2nd")
         elif day_no == 2:
-            return "3rd"
+            return _("3rd")
         else:
-            return ''.join([str(day_no + 1), "th"])
+            return _("%ith") % (day_no + 1)
 
     def list_view_representation(self):
         return [str(self.id), self.command, self.get_scheduled_description()]
@@ -190,10 +197,8 @@ class TaskEditDialog(Gtk.Dialog):
         self.disable_signals = False
 
     def create(self):
-        self.set_title(["Edit task", "New task"][self.brand_new])
+        self.set_title([_("Edit task"), _("New task")][self.brand_new])
         self.set_border_width(5)
-        self.set_icon_from_file(os.path.join(sys.path[0],
-                                            "images", "crontab.png"))
         self.set_resizable(False)
         self.set_size_request(500, -1)
         self.set_position(Gtk.WindowPosition.CENTER)
@@ -218,7 +223,7 @@ class TaskEditDialog(Gtk.Dialog):
         hbox = Gtk.HBox()
         self.vbox.pack_start(hbox, False, False, 10)
 
-        label = Gtk.Label(label="Command:")
+        label = Gtk.Label(label=_("Command:"))
         hbox.pack_start(label, False, True, 5)
 
         self.command_entry = Gtk.Entry()
@@ -235,19 +240,19 @@ class TaskEditDialog(Gtk.Dialog):
         grid.set_column_homogeneous(True)
         self.vbox.pack_start(grid, True, True, 0)
 
-        label = Gtk.Label("Schedule Task:", xalign=0)
+        label = Gtk.Label(_("Schedule Task:"), xalign=0)
         grid.attach(label, 0, 0, 1, 1)
 
         grid.attach(Gtk.Label(), 1, 0, 1, 1)   #padding
 
-        label = Gtk.Label("Start Time:")
+        label = Gtk.Label(_("Start Time:"))
         grid.attach(label, 2, 0, 1, 1)
 
 
         self.scheduled_combo = Gtk.ComboBoxText()
-        self.scheduled_combo.append_text("Daily")
-        self.scheduled_combo.append_text("Weekly")
-        self.scheduled_combo.append_text("Monthly")
+        self.scheduled_combo.append_text(_("Daily"))
+        self.scheduled_combo.append_text(_("Weekly"))
+        self.scheduled_combo.append_text(_("Monthly"))
         self.scheduled_combo.set_active(0)
         grid.attach(self.scheduled_combo, 0, 1, 2, 1)
 
@@ -261,7 +266,8 @@ class TaskEditDialog(Gtk.Dialog):
         self.hour_spin_button.set_width_chars(2)
         hbox.pack_start(self.hour_spin_button, True, True, 0)
 
-        hbox.pack_start(Gtk.Label(":"), False, False, 0)
+        # TRANSLATORS: This : is an hour:minute seperator.
+        hbox.pack_start(Gtk.Label(_(":")), False, False, 0)
 
         self.minute_spin_button = Gtk.SpinButton()
         self.minute_spin_button.set_range(0, 59)
@@ -282,7 +288,7 @@ class TaskEditDialog(Gtk.Dialog):
 
         # weekly stuff
 
-        self.weekly_label = Gtk.Label(" Run weekly on: ")
+        self.weekly_label = Gtk.Label(_("Run weekly on:"))
         grid.attach(self.weekly_label, 0, 0, 1, 1)
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
@@ -296,35 +302,35 @@ class TaskEditDialog(Gtk.Dialog):
         scrolledwindow.add(self.weekly_tree_view)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Checked")
+        column.set_title(_("Checked"))
         self.weekly_toggle_renderer = Gtk.CellRendererToggle()
         column.pack_start(self.weekly_toggle_renderer, True)
         self.weekly_tree_view.append_column(column)
-        column.add_attribute(self.weekly_toggle_renderer, "active", 0)
+        column.add_attribute(self.weekly_toggle_renderer, 'active', 0)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Day")
+        column.set_title(_("Day"))
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
         self.weekly_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 1)
+        column.add_attribute(renderer, 'text', 1)
 
         self.weekly_store = Gtk.ListStore(GObject.TYPE_BOOLEAN,
                                          GObject.TYPE_STRING)
         self.weekly_tree_view.set_model(self.weekly_store)
 
-        self.weekly_store.append([False, "Monday"])
-        self.weekly_store.append([False, "Tuesday"])
-        self.weekly_store.append([False, "Wednesday"])
-        self.weekly_store.append([False, "Thursday"])
-        self.weekly_store.append([False, "Friday"])
-        self.weekly_store.append([False, "Saturday"])
-        self.weekly_store.append([False, "Sunday"])
+        self.weekly_store.append([False, _("Monday")])
+        self.weekly_store.append([False, _("Tuesday")])
+        self.weekly_store.append([False, _("Wednesday")])
+        self.weekly_store.append([False, _("Thursday")])
+        self.weekly_store.append([False, _("Friday")])
+        self.weekly_store.append([False, _("Saturday")])
+        self.weekly_store.append([False, _("Sunday")])
 
 
         # monthly stuff
 
-        self.monthly_label = Gtk.Label(" Run monthly on the: ")
+        self.monthly_label = Gtk.Label(_("Run monthly on the:"))
         grid.attach(self.monthly_label, 1, 0, 1, 1)
 
         scrolledwindow = Gtk.ScrolledWindow(None, None)
@@ -338,18 +344,18 @@ class TaskEditDialog(Gtk.Dialog):
         scrolledwindow.add(self.monthly_tree_view)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Checked")
+        column.set_title(_("Checked"))
         self.monthly_toggle_renderer = Gtk.CellRendererToggle()
         column.pack_start(self.monthly_toggle_renderer, True)
         self.monthly_tree_view.append_column(column)
-        column.add_attribute(self.monthly_toggle_renderer, "active", 0)
+        column.add_attribute(self.monthly_toggle_renderer, 'active', 0)
 
         column = Gtk.TreeViewColumn()
-        column.set_title("Day")
+        column.set_title(_("Day"))
         renderer = Gtk.CellRendererText()
         column.pack_start(renderer, True)
         self.monthly_tree_view.append_column(column)
-        column.add_attribute(renderer, "text", 1)
+        column.add_attribute(renderer, 'text', 1)
 
         self.monthly_store = Gtk.ListStore(GObject.TYPE_BOOLEAN,
                                           GObject.TYPE_STRING)
@@ -360,12 +366,12 @@ class TaskEditDialog(Gtk.Dialog):
                                    [False, Task.get_day_of_month_name(day_no)])
 
         self.run_periodically_check = Gtk.CheckButton(
-                                    "Repeating schedule (run periodically)")
-        self.run_periodically_check.connect("toggled", self.on_update_captions)
+                                    _("Repeating schedule (run periodically)"))
+        self.run_periodically_check.connect('toggled', self.on_update_captions)
         self.vbox.pack_start(self.run_periodically_check, False, True, 0)
 
         self.non_interactive_check = Gtk.CheckButton(
-        "Don't interact with the logged-on user")
+        _("Don't interact with the logged-on user"))
         self.vbox.pack_start(self.non_interactive_check, False, True, 0)
 
 
@@ -373,16 +379,16 @@ class TaskEditDialog(Gtk.Dialog):
 
         self.action_area.set_layout(Gtk.ButtonBoxStyle.END)
 
-        self.cancel_button = Gtk.Button("Cancel", Gtk.STOCK_CANCEL)
+        self.cancel_button = Gtk.Button(_("Cancel"), Gtk.STOCK_CANCEL)
         self.cancel_button.set_can_default(True)
         self.add_action_widget(self.cancel_button, Gtk.ResponseType.CANCEL)
 
-        self.apply_button = Gtk.Button("Apply", Gtk.STOCK_APPLY)
+        self.apply_button = Gtk.Button(_("Apply"), Gtk.STOCK_APPLY)
         self.apply_button.set_can_default(True)
         self.apply_button.set_sensitive(not self.brand_new) # disabled for new task
         self.add_action_widget(self.apply_button, Gtk.ResponseType.APPLY)
 
-        self.ok_button = Gtk.Button("OK", Gtk.STOCK_OK)
+        self.ok_button = Gtk.Button(_("OK"), Gtk.STOCK_OK)
         self.ok_button.set_can_default(True)
         self.add_action_widget(self.ok_button, Gtk.ResponseType.OK)
 
@@ -391,19 +397,19 @@ class TaskEditDialog(Gtk.Dialog):
 
         # signals/events
 
-        self.scheduled_combo.connect("changed", self.on_update_sensitivity)
-        self.scheduled_combo.connect("changed", self.on_update_captions)
-        self.weekly_toggle_renderer.connect("toggled",
+        self.scheduled_combo.connect('changed', self.on_update_sensitivity)
+        self.scheduled_combo.connect('changed', self.on_update_captions)
+        self.weekly_toggle_renderer.connect('toggled',
                                   self.on_renderer_toggled, self.weekly_store)
-        self.monthly_toggle_renderer.connect("toggled",
+        self.monthly_toggle_renderer.connect('toggled',
                                  self.on_renderer_toggled, self.monthly_store)
-        self.hour_spin_button.connect("value-changed", self.on_update_captions)
-        self.minute_spin_button.connect("value-changed",
+        self.hour_spin_button.connect('value-changed', self.on_update_captions)
+        self.minute_spin_button.connect('value-changed',
                                                        self.on_update_captions)
 
     def check_for_problems(self):
         if (len(self.command_entry.get_text().strip()) == 0):
-            return "Please specify a command."
+            return _("Please specify a command.")
 
         index = self.scheduled_combo.get_active()
         last_active_row = None
@@ -414,14 +420,16 @@ class TaskEditDialog(Gtk.Dialog):
                     last_active_row = row
                     break
             if (last_active_row is None):
-                return "You need to select at least one day of the week, for a weekly schedule."
+                return _("You need to select at least one day of the week, "
+                        "for a weekly schedule.")
         elif (index == 2): # monthly schedule
             for row in self.monthly_store:
                 if (row[0]):
                     last_active_row = row
                     break
             if (last_active_row is None):
-                return "You need to select at least one day of the month, for a monthly schedule."
+                return _("You need to select at least one day of the month, "
+                        "for a monthly schedule.")
 
         return None
 
@@ -439,17 +447,17 @@ class TaskEditDialog(Gtk.Dialog):
         self.scheduled_label.set_text(self.task.get_scheduled_description())
 
         if (self.run_periodically_check.get_active()):
-            self.weekly_label.set_label(" Run weekly on: ")
-            self.monthly_label.set_label(" Run monthly on the: ")
+            self.weekly_label.set_label(_("Run weekly on:"))
+            self.monthly_label.set_label(_(" Run monthly on the:"))
 
-            self.weekly_toggle_renderer.set_property("radio", False)
-            self.monthly_toggle_renderer.set_property("radio", False)
+            self.weekly_toggle_renderer.set_property('radio', False)
+            self.monthly_toggle_renderer.set_property('radio', False)
         else:
-            self.weekly_label.set_label(" Run on next: ")
-            self.monthly_label.set_label(" Run on the next: ")
+            self.weekly_label.set_label(_("Run on next:"))
+            self.monthly_label.set_label(_("Run on the next:"))
 
-            self.weekly_toggle_renderer.set_property("radio", True)
-            self.monthly_toggle_renderer.set_property("radio", True)
+            self.weekly_toggle_renderer.set_property('radio', True)
+            self.monthly_toggle_renderer.set_property('radio', True)
 
             # make sure there's exactly one checked item when working with radios
             first_active_row = None
@@ -507,9 +515,9 @@ class TaskEditDialog(Gtk.Dialog):
 
         self.task.command = self.command_entry.get_text()
 
-        self.task.set_time(self.hour_spin_button.get_value()
-                          ,self.minute_spin_button.get_value()
-                          ,0)
+        self.task.set_time(self.hour_spin_button.get_value(),
+                            self.minute_spin_button.get_value(),
+                            0)
 
         index = self.scheduled_combo.get_active()
 
@@ -568,6 +576,6 @@ class ATSvcConnectDialog(ConnectDialog):
 
         super(ATSvcConnectDialog, self).__init__(
                     server, transport_type, username, password)
-        self.set_title('Connect to Server')
+        self.set_title(_("Connect to Server"))
 
 

@@ -229,6 +229,7 @@ class AddDnDialog(Gtk.Dialog):
     """Dialog that prompts for an a single line of text."""
     def __init__(self, dn=None, *args, **kwargs):
         super(AddDnDialog, self).__init__(*args, title=_("Enter DN"), **kwargs)
+        self.set_default_geometry(-1, 400)
         self.dn = dn
 
         name_box = Gtk.HBox()

@@ -71,11 +71,8 @@ along with this program. If not, see <http://www.gnu.org/licenses/>."""
 
 
 class ConnectDialog(Gtk.Dialog):
-
     """Connect Dialog"""
-
     def __init__(self, server, transport_type, username, password):
-
         super(ConnectDialog, self).__init__()
 
         self.server_address = server
@@ -87,7 +84,8 @@ class ConnectDialog(Gtk.Dialog):
 
         self.update_sensitivity()
 
-    def mod_create(self):           #interface to modify the builtin create to extend the gui
+    def mod_create(self):
+        # Interface to modify the builtin create to extend the gui
         pass
 
     def create(self):
@@ -100,67 +98,70 @@ class ConnectDialog(Gtk.Dialog):
 
         self.vbox.set_spacing(5)
 
-        # artwork TODO remove post decession
+        # artwork
 
         self.artwork = Gtk.VBox()
 
         self.samba_image_filename = get_resource('samba-logo-small.png')
         self.samba_image = Gtk.Image()
         self.samba_image.set_from_file(self.samba_image_filename)
-        self.artwork.pack_start(self.samba_image, True, True, 0)
+        self.artwork.pack_start(self.samba_image, expand=True, fill=True,
+                                padding=0)
 
-        label = Gtk.Label('Opening Windows to A Wider World')
+        label = Gtk.Label(_("Opening Windows to A Wider World"))
         box = Gtk.HBox()
-        box.pack_start(label, True, True, 0)
-        self.artwork.pack_start(box, True, True, 0)
+        box.pack_start(label, expand=True, fill=True, padding=0)
+        self.artwork.pack_start(box, expand=True, fill=True, padding=3)
 
-        label = Gtk.Label('Samba Control Center')
+        label = Gtk.Label(_("Samba Control Center"))
         box = Gtk.HBox()
-        box.pack_start(label, True, True, 0)
-        self.artwork.pack_start(box, True, True, 0)
+        box.pack_start(label, expand=True, fill=True, padding=0)
+        self.artwork.pack_start(box, expand=True, fill=True, padding=4)
 
-        self.vbox.pack_start(self.artwork, False, True, 0)
+        self.vbox.pack_start(self.artwork, expand=False, fill=True, padding=0)
 
         ########################### end of artwork TODO :
 
         # server frame
-
         self.server_frame = Gtk.Frame()
-        self.server_frame.set_property("label",' Server')
-        self.vbox.pack_start(self.server_frame, False, True, 0)
+        self.server_frame.set_property('label', _("Server"))
+        self.vbox.pack_start(self.server_frame, expand=False, fill=True,
+                            padding=0)
 
         grid = Gtk.Grid()
-        grid.set_property("border-width",5)
+        grid.set_column_spacing(6)
+        grid.set_row_spacing(4)
+        grid.set_property('border-width', 5)
         self.server_frame.add(grid)
 
-        label = Gtk.Label(' Server address: ',xalign=0, yalign=0.5)
+        label = Gtk.Label(_("Server address:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 0, 1, 1)
 
         self.server_address_entry = Gtk.Entry()
         self.server_address_entry.set_text(self.server_address)
-        self.server_address_entry.set_property("activates-default",True)
-        self.server_address_entry.set_property("tooltip-text",
-                                        'Enter the Server Address')
+        self.server_address_entry.set_property('activates-default', True)
+        self.server_address_entry.set_property('tooltip-text',
+                                        _("Enter the Server Address"))
         grid.attach(self.server_address_entry, 1, 0, 1, 1)
 
-        label = Gtk.Label(' Username: ',xalign=0, yalign=0.5)
+        label = Gtk.Label(_("Username:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 1, 1, 1)
 
         self.username_entry = Gtk.Entry()
         self.username_entry.set_text(self.username)
-        self.username_entry.set_property("activates-default",True)
-        self.username_entry.set_property("tooltip-text",
-                                            'Enter your Username')
+        self.username_entry.set_property('activates-default', True)
+        self.username_entry.set_property('tooltip-text',
+                                            _("Enter your Username"))
         grid.attach(self.username_entry, 1, 1, 1, 1)
 
-        label = Gtk.Label(' Password: ',xalign=0, yalign=0.5)
+        label = Gtk.Label(_("Password:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 2, 1, 1)
 
         self.password_entry = Gtk.Entry()
         self.password_entry.set_text(self.password)
-        self.password_entry.set_property("activates-default",True)
-        self.password_entry.set_property("tooltip-text",
-                                        'Enter your Password')
+        self.password_entry.set_property('activates-default', True)
+        self.password_entry.set_property('tooltip-text',
+                                        _("Enter your Password"))
         self.password_entry.set_visibility(False)
 
         grid.attach(self.password_entry, 1, 2, 1, 1)
@@ -168,50 +169,46 @@ class ConnectDialog(Gtk.Dialog):
         # transport frame
 
         self.transport_frame = Gtk.Frame()
-        self.transport_frame.set_property("label",' Transport type ')
+        self.transport_frame.set_property('label', _("Transport type"))
         self.vbox.pack_start(self.transport_frame, False, True, 0)
 
         vbox = Gtk.VBox()
-        vbox.set_property("border-width",5)
+        vbox.set_property('border-width', 5)
         self.transport_frame.add(vbox)
 
         self.rpc_smb_tcpip_radio_button = \
                         Gtk.RadioButton.new_with_label_from_widget(None,
-                'RPC over SMB over TCP/IP ')
+                                _("RPC over SMB over TCP/IP"))
         self.rpc_smb_tcpip_radio_button.set_tooltip_text(
-                                'ncacn_np type : Recomended (default)')
-        self.rpc_smb_tcpip_radio_button.set_active(
-                                            self.transport_type == 0)   # Default according MS-SRVS specification
+                                _("ncacn_np type : Recomended (default)"))
+        # Default according MS-SRVS specification
+        self.rpc_smb_tcpip_radio_button.set_active(self.transport_type == 0)
         vbox.pack_start(self.rpc_smb_tcpip_radio_button, True, True, 0)
 
-        self.rpc_tcpip_radio_button = \
-                        Gtk.RadioButton.new_with_label_from_widget(
+        self.rpc_tcpip_radio_button = Gtk.RadioButton.new_with_label_from_widget(
                             self.rpc_smb_tcpip_radio_button,
-                            'RPC over TCP/IP')
-        self.rpc_tcpip_radio_button.set_tooltip_text(
-                                                'ncacn_ip_tcp type')
+                            _("RPC over TCP/IP"))
+        self.rpc_tcpip_radio_button.set_tooltip_text(_("ncacn_ip_tcp type"))
         self.rpc_tcpip_radio_button.set_active(self.transport_type == 1)
         vbox.pack_start(self.rpc_tcpip_radio_button, True, True, 0)
 
-        self.localhost_radio_button = \
-            Gtk.RadioButton.new_with_label_from_widget(
-                            self.rpc_tcpip_radio_button, 'Localhost')
-        self.localhost_radio_button.set_tooltip_text(
-                                                'ncacn_ip_tcp type')
-        self.localhost_radio_button.set_active(self.transport_type == 2) #  MS-SRVS specification
+        self.localhost_radio_button = Gtk.RadioButton.new_with_label_from_widget(
+                            self.rpc_tcpip_radio_button, _("Localhost"))
+        self.localhost_radio_button.set_tooltip_text(_("ncacn_ip_tcp type"))
+        # MS-SRVS specification
+        self.localhost_radio_button.set_active(self.transport_type == 2)
         vbox.pack_start(self.localhost_radio_button, True, True, 0)
 
         # dialog buttons
         self.action_area.set_layout(Gtk.ButtonBoxStyle.END)
 
-        self.cancel_button = Gtk.Button('Cancel', Gtk.STOCK_CANCEL)
-        self.cancel_button.set_tooltip_text('Cancel and Quit')
-        self.add_action_widget(self.cancel_button,
-                                            Gtk.ResponseType.CANCEL)
+        self.cancel_button = Gtk.Button(_("Cancel"), Gtk.STOCK_CANCEL)
+        self.cancel_button.set_tooltip_text(_("Cancel and Quit"))
+        self.add_action_widget(self.cancel_button, Gtk.ResponseType.CANCEL)
 
-        self.connect_button = Gtk.Button('Connect', Gtk.STOCK_CONNECT)
+        self.connect_button = Gtk.Button(_("Connect"), Gtk.STOCK_CONNECT)
         self.connect_button.set_can_default(True)
-        self.cancel_button.set_tooltip_text('OK / Connect to Server')
+        self.cancel_button.set_tooltip_text(_("OK / Connect to Server"))
         self.add_action_widget(self.connect_button, Gtk.ResponseType.OK)
 
         self.set_default_response(Gtk.ResponseType.OK)
