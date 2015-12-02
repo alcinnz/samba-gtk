@@ -142,6 +142,7 @@ setup(
                         'icons/512/samba.png']),
                  ('/usr/share/icons/hicolor/256x256/apps', [
                         'icons/256/samba.png',
+                        'icons/256/samba-gtkldb.png',
                         'icons/256/samba-gwcrontab.png',
                         'icons/256/samba-registry.png',
                         'icons/256/samba-gwsam.png',
@@ -150,6 +151,7 @@ setup(
                         'icons/256/samba-gwwkssvc.png']),
                  ('/usr/share/icons/hicolor/128x128/apps', [
                         'icons/128/samba.png',
+                        'icons/128/samba-gtkldb.png',
                         'icons/128/samba-gwcrontab.png',
                         'icons/128/samba-registry.png',
                         'icons/128/samba-gwsam.png',
@@ -158,6 +160,7 @@ setup(
                         'icons/128/samba-gwwkssvc.png']),
                  ('/usr/share/icons/hicolor/64x64/apps', [
                         'icons/64/samba.png',
+                        'icons/64/samba-gtkldb.png',
                         'icons/64/samba-gwcrontab.png',
                         'icons/64/samba-registry.png',
                         'icons/64/samba-gwsam.png',
@@ -166,6 +169,7 @@ setup(
                         'icons/64/samba-gwwkssvc.png']),
                  ('/usr/share/icons/hicolor/48x48/apps', [
                         'icons/48/samba.png',
+                        'icons/48/samba-gtkldb.png',
                         'icons/48/samba-gwcrontab.png',
                         'icons/48/samba-registry.png',
                         'icons/48/samba-gwsam.png',

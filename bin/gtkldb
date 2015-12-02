@@ -30,7 +30,7 @@ from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GObject
 from gi.repository import GLib
-from sambagtk.dialogs import AboutDialog
+from sambagtk.dialogs import AboutDialog, ConnectDialog
 from sambagtk import moderngtk, ldb_widgets as widgets
 from sambagtk.ldb_widgets import ActionedTreeView
 import gettext
@@ -489,9 +489,7 @@ class LdbBrowser(Gtk.Window):
     """Sambagtk Ldb Browser."""
     def __init__(self):
         super(LdbBrowser, self).__init__()
-        self.url_store = Gtk.ListStore(int, str) #for history
         self.ldb = None
-        self.url_store_count =0
         self.search_result = None
         self.create()
 
@@ -594,7 +592,7 @@ class LdbBrowser(Gtk.Window):
         aboutwin = AboutDialog("GTK LDB",
                             _("LDB database browser/editor\n"
                             "Based on Jelmer Vernooij's original Samba-GTK"),
-                            None)
+                            'samba-gtkldb')
         aboutwin.run()
         aboutwin.destroy()
 
@@ -614,14 +612,10 @@ class LdbBrowser(Gtk.Window):
         self.dn_tree.set_ldb(ldb)
 
     def cb_connect(self, button):
-        dialog = LdbURLDialog(url_store = self.url_store)
+        dialog = widgets.LdbURLDialog()
         if dialog.run() == Gtk.ResponseType.OK:
-            url,add_url_to_store = dialog.get_url()
-            self.set_ldb(Ldb(url))
-            #if it isn't already in the url store add it for further use
-            if add_url_to_store :
-                self.url_store_count += 1
-                self.url_store.append([self.url_store_count, url])
+            ldb = dialog.get_ldb()
+            self.set_ldb(ldb)
             self.disconnect_item.set_sensitive(True)
             self.find_item.set_sensitive(True)
             self.hide_special.set_sensitive(True)
@@ -633,7 +627,7 @@ class LdbBrowser(Gtk.Window):
                     buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                             Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
         if dialog.run() == Gtk.ResponseType.OK:
-            self.set_ldb(Ldb(dialog.get_filename()))
+            self.set_ldb(widgets.Ldb(dialog.get_filename()))
 
         dialog.destroy()
 
@@ -661,24 +655,11 @@ class LdbBrowser(Gtk.Window):
         """Change currently selected dn and refresh attributes"""
         self.attribute_view.set_dn(self.ldb, item)
 
-def Ldb(url):
-    """Create a new LDB object.
-
-    :param url: LDB URL to connect to.
-    """
-    ret = ldb.Ldb()
-    path = os.getenv("LDB_MODULES_PATH")
-    if path is not None:
-        ret.set_modules_dir(path)
-    ret.connect(url)
-    return ret
-
-
 if __name__ == '__main__':
     GLib.set_prgname("gtkldb")
 
     browser = LdbBrowser()
     if len(sys.argv) > 1:
-        browser.set_ldb(Ldb(sys.argv[1]))
+        browser.set_ldb(widgets.Ldb(sys.argv[1]))
     browser.show_all()
     Gtk.main()

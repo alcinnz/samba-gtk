@@ -1,7 +1,8 @@
 """Defines special purpose widgets for viewing LDB databases. """
 from gi.repository import Gtk, GObject
-import moderngtk
+from  sambagtk import moderngtk, dialogs
 import ldb
+import os
 
 class SearchBar(Gtk.Revealer):
     """This is like a Gtk.SearchBar (and styled similarly) but
@@ -200,30 +201,20 @@ class EditorDialog(Gtk.Dialog):
     def set_text(self, text):
         self.text.set_text(text)
 
-class LdbURLDialog(Gtk.Dialog):
-    """Dialog that prompts for a LDB URL."""
-    def __init__(self, parent=None,  url_store=None):
-        super(LdbURLDialog, self).__init__(parent=parent,
-                    buttons=(Gtk.STOCK_CANCEL,Gtk.ResponseType.CANCEL,
-                            Gtk.STOCK_OPEN,Gtk.ResponseType.OK))
-        label = Gtk.Label(_("Enter URL:"))
-        self.vbox.pack_start(label, expand=True, fill=True, padding=0)
-        self.url_combo_entry =  Gtk.ComboBox.new_with_model_and_entry(url_store)
-        self.url_combo_entry.set_entry_text_column(1)
-        self.vbox.pack_start(self.url_combo_entry, expand=True, fill=True,
-        					padding=0)
-        self.show_all()
+class LdbURLDialog(dialogs.ConnectDialog):
+    """Dialog that prompts for a LDB URL, and possibly username and password."""
+    def __init__(self):
+        super(LdbURLDialog, self).__init__("", 0, "", "")
+        self.set_title("Connect to LDAP")
+        self.transport_frame.hide()
 
-    def get_url(self):
-        tree_iter = self.url_combo_entry.get_active_iter()
-        if tree_iter is not None:
-            model = self.url_combo_entry.get_model()
-            url = model[tree_iter][1]
-            return (url,False)
-        else:
-            entry = self.url_combo_entry.get_child()
-            url = entry.get_text()
-            return (url,True)
+    def get_ldb(self):
+        print self.get_username(), self.get_password()
+        return Ldb("ldap://"+self.get_server_address(), 0, [
+                        "bindMech=simple",
+                        "bindID=%s" % self.get_username(),
+                        "bindSecret=%s" % self.get_password()
+                    ])
 
 class AddDnDialog(Gtk.Dialog):
     """Dialog that prompts for an a single line of text."""
@@ -338,3 +329,15 @@ class AddAttrDialog(Gtk.Dialog):
 
     def get_data(self):
         return self.attr_entry.get_text(), self.value_entry.get_text()
+
+def Ldb(*args):
+    """Create a new LDB object.
+
+    :param url: LDB URL to connect to.
+    """
+    ret = ldb.Ldb()
+    path = os.getenv("LDB_MODULES_PATH")
+    if path is not None:
+        ret.set_modules_dir(path)
+    ret.connect(*args)
+    return ret

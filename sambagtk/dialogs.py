@@ -81,6 +81,7 @@ class ConnectDialog(Gtk.Dialog):
         self.transport_type = transport_type
         self.domains = None #required for sam manager
         self.create()
+        self.show_all()
 
         self.update_sensitivity()
 

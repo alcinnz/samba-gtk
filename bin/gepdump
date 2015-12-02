@@ -36,7 +36,8 @@ gettext.install('gepdump')
 
 from gi.repository import Gtk
 from gi.repository import GObject
-from sambagtk.dialogs import AboutDialog,ConnectDialog,get_default_logo
+from gi.repository import GLib
+from sambagtk.dialogs import AboutDialog,ConnectDialog
 from sambagtk import moderngtk
 from samba import credentials
 from samba.dcerpc import mgmt, epmapper, misc
@@ -45,10 +46,10 @@ from samba.dcerpc import mgmt, epmapper, misc
 class EndpointBrowser(Gtk.Window):
 
 
-    def __init__(self, server= '', username='',password='', 
+    def __init__(self, server= '', username='',password='',
                 transport_type=0, connect_now = False):
         super(EndpointBrowser, self).__init__()
-        
+
         self.server_address = server
         self.username = username
         self.transport_type = transport_type
@@ -62,7 +63,6 @@ class EndpointBrowser(Gtk.Window):
 
         self.set_title(_("Sambagtk Endpoint Mapper Viewer Utility"))
         self.set_default_size(800, 600)
-        self.set_icon_from_file(get_default_logo("samba-logo-square"))
         accel_group = Gtk.AccelGroup()
 
 
@@ -71,16 +71,16 @@ class EndpointBrowser(Gtk.Window):
 
         #toolbar
         toolbar = moderngtk.build_toolbar(self, main_vbox)
-        
+
         self.connect_item = Gtk.ToolButton.new_from_stock(Gtk.STOCK_CONNECT)
         self.connect_item.set_tooltip_text(_("Connect to a Samba endpoint"))
         toolbar.add(self.connect_item)
-        
+
         self.refresh_item = Gtk.ToolButton.new_from_stock(Gtk.STOCK_REFRESH)
         self.refresh_item.set_tooltip_text(
                     _("Reload data from the Samba endpoint"))
         toolbar.add(self.refresh_item)
-        
+
         self.about_item = Gtk.ToolButton.new_from_stock(Gtk.STOCK_ABOUT)
         self.about_item.set_tooltip_text(_("About gepdump"))
         if hasattr(toolbar, 'pack_end'):
@@ -229,11 +229,11 @@ class EndpointBrowser(Gtk.Window):
         self.add_accel_group (accel_group)
 
 
-        
+
     def on_self_delete(self, widget, event):
         Gtk.main_quit()
         return False
-        
+
     def on_about_activate(self, menuitem):
         aboutwin = AboutDialog("GEpDump",
                               _("Samba Endpoint Browser Tool.\n"
@@ -268,7 +268,7 @@ class EndpointBrowser(Gtk.Window):
         #   this seems to work for now
         while num_ents == max_ents:
             (handle, ents, ent_result) = self.epmapper_pipe.epm_Lookup(
-                inquiry_type=0, object=None, interface_id=None, 
+                inquiry_type=0, object=None, interface_id=None,
                 vers_option=0,entry_handle=handle, max_ents=max_ents)
             for ent in ents:
                 self.add_epm_entry(ent.annotation, ent.tower.tower)
@@ -317,7 +317,7 @@ class EndpointBrowser(Gtk.Window):
     def set_status(self, message):
         self.statusbar.pop(0)
         self.statusbar.push(0, message)
-        
+
     def run_message_dialog(self, type, buttons, message, parent=None):
         if parent is None:
             parent = self
@@ -379,7 +379,7 @@ class EndpointBrowser(Gtk.Window):
                                 dialog)
                         dialog.password_entry.grab_focus()
                         # select all the text in the password box
-                        dialog.password_entry.select_region(0, -1) 
+                        dialog.password_entry.select_region(0, -1)
                     elif re.args[0] == 5 or re.args[1] == 'Access denied':
                         self.run_message_dialog(Gtk.MessageType.ERROR,
                                 Gtk.ButtonsType.OK,
@@ -532,6 +532,7 @@ def ParseArgs(argv):
 
 
 if __name__ == '__main__':
+    GLib.set_prgname('gepdump')
     arguments = ParseArgs(sys.argv[1:])
 
     main_window = EndpointBrowser(**arguments)
