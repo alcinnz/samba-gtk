@@ -613,12 +613,17 @@ class LdbBrowser(Gtk.Window):
 
     def cb_connect(self, button):
         dialog = widgets.LdbURLDialog()
-        if dialog.run() == Gtk.ResponseType.OK:
-            ldb = dialog.get_ldb()
-            self.set_ldb(ldb)
-            self.disconnect_item.set_sensitive(True)
-            self.find_item.set_sensitive(True)
-            self.hide_special.set_sensitive(True)
+        while dialog.run() == Gtk.ResponseType.OK:
+            try:
+                ldb = dialog.get_ldb()
+                self.set_ldb(ldb)
+                dialog.save_config()
+                self.disconnect_item.set_sensitive(True)
+                self.find_item.set_sensitive(True)
+                self.hide_special.set_sensitive(True)
+                break
+            except Exception, ex:
+                self.ldb_error_exception(ex)
         dialog.destroy()
 
     def cb_open(self, button):
@@ -639,7 +644,7 @@ class LdbBrowser(Gtk.Window):
 
     def ldb_error_exception(self, err, msg=None, level=Gtk.MessageType.ERROR):
         if msg is None:
-            if err is ldb.LdbError:
+            if type(err) is ldb.LdbError:
                 code, msg = err
 
                 if code == 34: return # Skip the annoying "No messages found"

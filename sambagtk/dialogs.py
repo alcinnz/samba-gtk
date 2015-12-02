@@ -22,6 +22,7 @@ from gi.repository import GdkPixbuf
 import samba
 import os
 import sys
+from ConfigParser import RawConfigParser
 
 from moderngtk import get_resource
 
@@ -69,21 +70,51 @@ along with this program. If not, see <http://www.gnu.org/licenses/>."""
         self.set_property("authors",authors)
         self.set_property("copyright",copyright_text)
 
-
 class ConnectDialog(Gtk.Dialog):
     """Connect Dialog"""
+    CONFFILE = os.path.expanduser("~/.samba-gtk/connections")
     def __init__(self, server, transport_type, username, password):
         super(ConnectDialog, self).__init__()
 
-        self.server_address = server
-        self.username = username
-        self.password = password
+        self.config = RawConfigParser()
+        if os.path.exists(self.CONFFILE):
+            self.config.read([self.CONFFILE])
+            print self.config.sections()
+
+        self.server_address = server or self.get_config("Server")
+        self.username = username or self.get_config("Username")
+        self.password = password or self.get_config("Password")
         self.transport_type = transport_type
-        self.domains = None #required for sam manager
+        if self.transport_type is None:
+            self.transport_type = self.get_config("Transport")
+        self.domains = self.get_config("Domain") #required for sam manager
         self.create()
         self.show_all()
 
         self.update_sensitivity()
+
+    def get_config(self, value):
+        if self.config.has_option("Connection", value):
+            ret = self.config.get("Connection", value)
+            return ret
+        else:
+            return ""
+
+    def save_config(self):
+        """Call this to let the dialog remember previous settings."""
+        if not self.config.has_section("Connection"):
+            self.config.add_section("Connection")
+
+        self.config.set("Connection", "Server",    self.get_server_address())
+        self.config.set("Connection", "Username",  self.get_username())
+        self.config.set("Connection", "Password",  self.get_password())
+        self.config.set("Connection", "Transport", self.get_transport_type())
+
+        path = os.path.dirname(self.CONFFILE)
+        if not os.path.exists(path):
+            os.mkdir(path)
+        with open(self.CONFFILE, 'w') as f:
+            self.config.write(f)
 
     def mod_create(self):
         # Interface to modify the builtin create to extend the gui
@@ -113,11 +144,6 @@ class ConnectDialog(Gtk.Dialog):
         box = Gtk.HBox()
         box.pack_start(label, expand=True, fill=True, padding=0)
         self.artwork.pack_start(box, expand=True, fill=True, padding=3)
-
-        label = Gtk.Label(_("Samba Control Center"))
-        box = Gtk.HBox()
-        box.pack_start(label, expand=True, fill=True, padding=0)
-        self.artwork.pack_start(box, expand=True, fill=True, padding=4)
 
         self.vbox.pack_start(self.artwork, expand=False, fill=True, padding=0)
 

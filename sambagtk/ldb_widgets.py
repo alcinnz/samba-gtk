@@ -209,7 +209,6 @@ class LdbURLDialog(dialogs.ConnectDialog):
         self.transport_frame.hide()
 
     def get_ldb(self):
-        print self.get_username(), self.get_password()
         return Ldb("ldap://"+self.get_server_address(), 0, [
                         "bindMech=simple",
                         "bindID=%s" % self.get_username(),
