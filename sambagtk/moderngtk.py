@@ -19,7 +19,7 @@ def build_toolbar(window, vbox):
         toolbar.set_show_close_button(True)
     else:
         toolbar = Gtk.Toolbar()
-        vbox.pack_start(self.toolbar, expand=False, fill=False, padding=0)
+        vbox.pack_start(toolbar, expand=False, fill=False, padding=0)
     return toolbar
 
 class InfoBar(Gtk.Revealer):

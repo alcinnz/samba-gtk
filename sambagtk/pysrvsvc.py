@@ -209,7 +209,7 @@ class ShareAddEditDialog(Gtk.Dialog):
 
         hbox = Gtk.HBox()
         icon = Gtk.Image()
-        icon.set_from_icon_name(self.icon_name)
+        icon.set_from_icon_name(self.icon_name, Gtk.IconSize.DIALOG)
 
         hbox.pack_start(icon, False, True, 0)
         self.desc_box.pack_start(hbox, False, True, 0)
@@ -358,6 +358,7 @@ class ShareAddEditDialog(Gtk.Dialog):
 
         grid = Gtk.Grid()
         grid.set_property('column-spacing', 6)
+        grid.set_property('border-width', 7)
         frame.add(grid)
 
         label = Gtk.Label(_("Share path:"), xalign = 0, yalign=0.5)
@@ -381,7 +382,7 @@ class ShareAddEditDialog(Gtk.Dialog):
             self.file_entry.set_property('text', self.path)
             self.file_entry.set_tooltip_text(
                                         _("Path to the folder to share"))
-            grid.attach(self.file_button, 1, 0, 1, 1)
+            grid.attach(self.file_entry, 1, 0, 1, 1)
 
         # max users frame
 
@@ -395,6 +396,7 @@ class ShareAddEditDialog(Gtk.Dialog):
 
         grid = Gtk.Grid()
         grid.set_property('column-spacing', 6)
+        grid.set_property('border-width', 7)
         frame.add(grid)
 
         label = Gtk.Label(_("Max Users:"), xalign=0, yalign=0.5)

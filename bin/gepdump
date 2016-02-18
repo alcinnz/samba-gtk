@@ -38,14 +38,12 @@ from gi.repository import Gtk
 from gi.repository import GObject
 from gi.repository import GLib
 from sambagtk.dialogs import AboutDialog,ConnectDialog
-from sambagtk import moderngtk
+from sambagtk import moderngtk, connect
 from samba import credentials
 from samba.dcerpc import mgmt, epmapper, misc
 
 
 class EndpointBrowser(Gtk.Window):
-
-
     def __init__(self, server= '', username='',password='',
                 transport_type=0, connect_now = False):
         super(EndpointBrowser, self).__init__()
@@ -55,7 +53,7 @@ class EndpointBrowser(Gtk.Window):
         self.transport_type = transport_type
 
         self.create()
-        self.set_status(_('Disconnected.'))
+        self.set_status(_("Disconnected"))
         self.on_connect_item_activate(None, server, transport_type,
                                         username, password, connect_now)
 
@@ -118,7 +116,7 @@ class EndpointBrowser(Gtk.Window):
 
         self.store_eps = Gtk.TreeStore(GObject.TYPE_STRING,
                                         GObject.TYPE_STRING,
-                                        GObject.TYPE_POINTER)
+                                        GObject.TYPE_PYOBJECT)
         self.tree_eps.set_model(self.store_eps)
 
         scrolledwindow.add(self.tree_eps)
@@ -211,7 +209,7 @@ class EndpointBrowser(Gtk.Window):
         self.store_princ_names = Gtk.ListStore(GObject.TYPE_STRING,
                                               GObject.TYPE_STRING,
                                               GObject.TYPE_STRING,
-                                              GObject.TYPE_POINTER)
+                                              GObject.TYPE_PYOBJECT)
         self.treeview_princ_names.set_model(self.store_princ_names)
 
         # statusbar
@@ -244,19 +242,10 @@ class EndpointBrowser(Gtk.Window):
 
 
     def add_epm_entry(self, annotation, t):
-        # TODO : This stuff here makes no sense to me.
-        bd = t.as_binding_string()
+        # TODO: How to get the Binding Strings? Using "" for now.
+        #       Use t.floors[0].lhs?
 
-        self.store_eps.append((0, annotation, 1, str(bd), 2, t))
-
-        for floor in t.floors:
-            if floor.lhs.protocol == epmapper.EPM_PROTOCOL_UUID:
-                data = str(floor.get_lhs_data().uuid)
-            else:
-                data = floor.get_rhs_data()
-
-            self.store_eps.append((0, self.get_protocol_name(floor.lhs.protocol),
-                                  1, data, -1))
+        self.store_eps.append(None, (annotation, "", t))
 
     def refresh_eps(self):
         self.store_eps.clear()
@@ -266,12 +255,14 @@ class EndpointBrowser(Gtk.Window):
 
         # TODO: Need to figure out the correct iface here,
         #   this seems to work for now
-        while num_ents == max_ents:
-            (handle, ents, ent_result) = self.epmapper_pipe.epm_Lookup(
-                inquiry_type=0, object=None, interface_id=None,
-                vers_option=0,entry_handle=handle, max_ents=max_ents)
-            for ent in ents:
-                self.add_epm_entry(ent.annotation, ent.tower.tower)
+        handle, ents, ent_result = self.epmapper_pipe.epm_Lookup(
+            inquiry_type=0, object=None, interface_id=None,
+            vers_option=0,entry_handle=handle, max_ents=max_ents)
+        for ent in ents:
+            print ent.annotation
+            def attrs(x):
+                return [attr for attr in dir(x) if attr[0] != "_"]
+            self.add_epm_entry(ent.annotation, ent.tower.tower)
 
     def on_refresh_clicked(self, btn):
         self.refresh_eps()
@@ -438,7 +429,7 @@ class EndpointBrowser(Gtk.Window):
         try:
             pipes = self.run_connect_dialog(None, server,
                     transport_type, username, password, connect_now)
-            if pipes is not None :
+            if pipes is not None:
                 self.epmapper_pipe,self.mgmt_pipe = pipes
             self.set_status(_('Connected to Server: IP=%s ')%self.server_address)
         except RuntimeError, re:
@@ -479,6 +470,7 @@ class EndpointBrowser(Gtk.Window):
     @staticmethod
     def build_pipe_params(server_address, transport_type, username, password):
         creds = credentials.Credentials()
+        creds.guess()
         if username.count('\\') > 0x00000000:
             creds.set_domain(username.split('\\')[0x00000000])
             creds.set_username(username.split('\\')[1])
@@ -494,7 +486,7 @@ class EndpointBrowser(Gtk.Window):
         # binding = "ncacn_np:%s" # srvsvc allows only named pipes
         # tcp/upd not allowed under MS-SRVS specifications
 
-
+        # TODO ncapn_np:... throws 'NT_STATUS_OBJECT_NAME_NOT_FOUND'
         binding = ['ncacn_np:%s', 'ncacn_ip_tcp:%s', 'ncalrpc:%s'
                     ][transport_type]
         if transport_type is 2:
@@ -503,37 +495,9 @@ class EndpointBrowser(Gtk.Window):
 
         return pipe_binding, creds
 
-def ParseArgs(argv):
-    arguments = {}
-
-    try:  # get arguments into a nicer format
-        (opts, args) = getopt.getopt(argv, 'chu:s:p:t:', ['help',
-                        'user=', 'server=', 'password=', 'connect-now',
-                        'transport='])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for (opt, arg) in opts:
-        if opt in ('-h', '--help'):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ('-s', '--server'):
-            arguments.update({'server': arg})
-        elif opt in ('-u', '--user'):
-            arguments.update({'username': arg})
-        elif opt in ('-p', '--password'):
-            arguments.update({'password': arg})
-        elif opt in ('-t', '--transport'):
-            arguments.update({'transport_type': int(arg)})
-        elif opt in ('-c', '--connect-now'):
-            arguments.update({'connect_now': True})
-    return arguments
-
-
 if __name__ == '__main__':
     GLib.set_prgname('gepdump')
-    arguments = ParseArgs(sys.argv[1:])
+    arguments = connect.parse_args('gepdump', sys.argv[1:])
 
     main_window = EndpointBrowser(**arguments)
     main_window.show_all()

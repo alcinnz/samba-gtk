@@ -27,6 +27,7 @@ from sambagtk.moderngtk import get_resource, build_toolbar
 from sambagtk.dialogs import (
     AboutDialog,
     )
+from sambagtk import connect
 
 class SAMPipeManager(object):
 
@@ -510,7 +511,6 @@ class SAMWindow(Gtk.Window):
         connect_menu = Gtk.Menu()
         self.sel_domain_item = Gtk.MenuItem.new_with_mnemonic(
                                             _("_Select Domain"))
-        self.sel_domain_item.set_sensitive(False)
         connect_menu.add(self.sel_domain_item)
         connect_menu.show_all()
         self.disconnect_button.set_menu(connect_menu)
@@ -946,7 +946,7 @@ class SAMWindow(Gtk.Window):
                         self.username = username
                         domain_index = 0
                         self.domain_index = domain_index
-                        password = dialog.get_password()
+                        self.password = password = dialog.get_password()
 
                         pipe_manager = SAMPipeManager(server_address,
                                             transport_type, username, password)
@@ -1145,6 +1145,7 @@ class SAMWindow(Gtk.Window):
         try:
             self.pipe_manager = self.run_connect_dialog(self.pipe_manager,
                     self.server_address, self.transport_type, self.username,
+                    self.password,
                     domains = self.pipe_manager.fetch_and_get_domain_names())
             if self.pipe_manager is not None:
                 self.pipe_manager.fetch_users_and_groups()
@@ -1380,56 +1381,10 @@ class SAMWindow(Gtk.Window):
     def on_update_sensitivity(self, widget):
         self.update_sensitivity()
 
-
-def PrintUsage():
-    print "Usage: %s [OPTIONS]" % (str(os.path.split(__file__)[-1]))
-    print "All options are optional. "
-    print "The user will be queried for additional information if needed.\n"
-    print "  -s  --server\t\tspecify the server to connect to."
-    print "  -u  --user\t\tspecify the user."
-    print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type."
-    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
-    print "\t\t\t\t1 for RPC, TCP/IP"
-    print "\t\t\t\t2 for localhost."
-    print "  -c  --connect-now\tSkip the connect dialog."
-    #TODO: mention domain index.
-    # And maybe come up with a better way of handling it?
-
-def ParseArgs(argv):
-    arguments = {}
-
-    try: #get arguments into a nicer format
-        opts, args = getopt.getopt(argv, "chu:s:p:t:", [
-                                            "help", "user=",
-                                            "server=", "password=",
-                                            "connect-now", "transport="])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ("-s", "--server"):
-            arguments.update({"server":arg})
-        elif opt in ("-u", "--user"):
-            arguments.update({"username":arg})
-        elif opt in ("-p", "--password"):
-            arguments.update({"password":arg})
-        elif opt in ("-t", "--transport"):
-            arguments.update({"transport_type":int(arg)})
-        elif opt in ("-c", "--connect-now"):
-            arguments.update({"connect_now":True})
-    return (arguments)
-
-
-
 if __name__ == "__main__":
     GLib.set_prgname('gwsam')
     # The [1:] ignores the first argument, which is the path to our utility
-    arguments = ParseArgs(sys.argv[1:]) 
+    arguments = connect.parse_args("gwsam", sys.argv[1:])
 
     main_window = SAMWindow(**arguments)
     main_window.show_all()

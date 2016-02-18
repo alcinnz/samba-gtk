@@ -14,6 +14,7 @@ from samba.dcerpc import atsvc
 
 from sambagtk.dialogs import AboutDialog
 from sambagtk.moderngtk import build_toolbar, build_inline_toolbar
+from sambagtk import connect
 
 from sambagtk.atsvc import ATSvcConnectDialog, Task, TaskEditDialog
 
@@ -386,6 +387,7 @@ class CronTabWindow(Gtk.Window):
                     self.username = username
                     password = dialog.get_password()
 
+                    print "Throws 'NT_STATUS_PORT_UNREACHABLE'"
                     pipe_manager = ATSvcPipeManager(server_address,
                                                    transport_type,
                                                    username,
@@ -659,53 +661,10 @@ class CronTabWindow(Gtk.Window):
     def on_update_sensitivity(self, widget):
         self.update_sensitivity()
 
-
-def PrintUsage():
-    print "Usage: %s [OPTIONS]" % (str(os.path.split(__file__)[-1]))
-    print ("All options are optional. "
-            "The user will be queried for additional information if needed.\n")
-    print "  -s  --server\t\tspecify the server to connect to."
-    print "  -u  --user\t\tspecify the user."
-    print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type."
-    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
-    print "\t\t\t\t1 for RPC, TCP/IP"
-    print "\t\t\t\t2 for localhost."
-    print "  -c  --connect-now\tSkip the connect dialog."
-
-def ParseArgs(argv):
-    arguments = {}
-
-    try: #get arguments into a nicer format
-        opts, args = getopt.getopt(argv, "hu:s:p:ct:", ["help",
-                                                        "user=",
-                                                        "server=",
-                                                        "password=",
-                                                        "connect-now",
-                                                        "transport="])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ("-s", "--server"):
-            arguments.update({"server":arg})
-        elif opt in ("-u", "--user"):
-            arguments.update({"username":arg})
-        elif opt in ("-p", "--password"):
-            arguments.update({"password":arg})
-        elif opt in ("-t", "--transport"):
-            arguments.update({"transport_type":int(arg)})
-        elif opt in ("-c", "--connect-now"):
-            arguments.update({"connect_now":True})
-    return (arguments)
-
 if __name__ == "__main__":
     GLib.set_prgname("gwcrontab")
-    arguments = ParseArgs(sys.argv[1:]) #the [1:] ignores the first argument, which is the path to our utility
+    #the [1:] ignores the first argument, which is the path to our utility
+    arguments = connect.parse_args("gwcrontab", sys.argv[1:])
 
     main_window = CronTabWindow(**arguments)
     main_window.show_all()

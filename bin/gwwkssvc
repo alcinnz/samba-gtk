@@ -29,9 +29,10 @@ __docformat__ = 'restructuredtext'
 from samba import credentials
 from samba.dcerpc import wkssvc,security
 
-from sambagtk.wkssvc import (wkssvcConnectDialog , DeleteDialog)
+from sambagtk.wkssvc import wkssvcConnectDialog, DeleteDialog, DomainJoinDialog
 from sambagtk.dialogs import AboutDialog
 from sambagtk.moderngtk import build_toolbar
+from sambagtk import connect
 
 import sys
 import os.path
@@ -404,14 +405,13 @@ class WkssvcWindow(Gtk.Window):
     def on_join_item_activate(self, widget):
 
         required_data = self.run_new_join_dialog()
-        self.pipe_manager.join_domian()
 
         if required_data is None:
             self.set_status(_("Join canceled"))
             return
 
         try:
-            self.pipe_manager.join_domian(required_data.get(server_address),
+            self.pipe_manager.join_domain(required_data.get(server_address),
                                         required_data.get(domain_name),
                                         required_data.get(machine_name),
                                         required_data.get(username),
@@ -489,9 +489,10 @@ class WkssvcWindow(Gtk.Window):
 
     def on_disconnect_item_activate(self, widget):
         if self.pipe_manager is not None:
-            self.pipe_manager.close()
+            #self.pipe_manager.close()
             self.pipe_manager = None
             self.wkst_info = None
+        self.update_sensitivity()
         self.set_status('Disconnected.')
 
     def on_key_press(self, widget, event):
@@ -608,52 +609,9 @@ class WkssvcWindow(Gtk.Window):
 
 ###############################################################################
 
-
-def PrintUsage():
-    print "Usage: %s [OPTIONS]" % str(os.path.split(__file__)[-1])
-    print "All options are optional."
-    print "The user will be queried for additional information if needed.\n"
-    print "  -s  --server\t\tspecify the server to connect to."
-    print "  -u  --user\t\tspecify the username."
-    print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type."
-    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
-    print "\t\t\t\t1 for RPC, TCP/IP"
-    print "\t\t\t\t2 for localhost."
-    print "  -c  --connect-now\tSkip the connect dialog."
-
-
-def ParseArgs(argv):
-    arguments = {}
-
-    try:  # get arguments into a nicer format
-        (opts, args) = getopt.getopt(argv, 'chu:s:p:t:', ['help',
-                        'user=', 'server=', 'password=', 'connect-now',
-                        'transport='])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for (opt, arg) in opts:
-        if opt in ('-h', '--help'):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ('-s', '--server'):
-            arguments.update({'server': arg})
-        elif opt in ('-u', '--user'):
-            arguments.update({'username': arg})
-        elif opt in ('-p', '--password'):
-            arguments.update({'password': arg})
-        elif opt in ('-t', '--transport'):
-            arguments.update({'transport_type': int(arg)})
-        elif opt in ('-c', '--connect-now'):
-            arguments.update({'connect_now': True})
-    return arguments
-
-
 if __name__ == '__main__':
     GLib.set_prgname('gwwksvc')
-    arguments = ParseArgs(sys.argv[1:])
+    arguments = connect.parse_args("gwwksvc", sys.argv[1:])
 
     main_window = WkssvcWindow(**arguments)
     main_window.show_all()

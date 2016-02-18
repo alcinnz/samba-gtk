@@ -26,6 +26,7 @@ from sambagtk.registry import (
     RegPermissionsDialog,
     WinRegConnectDialog,
     )
+from sambagtk import connect
 
 from sambagtk.dialogs import (
     AboutDialog,
@@ -1426,7 +1427,7 @@ class RegEditWindow(Gtk.Window):
         self.export_button.set_sensitive(connected)
         self.modify_button.set_sensitive(connected and value_selected)
         self.permissions_button.set_sensitive(connected and 
-                                                (key_selected_or_value_selected))
+                                                (key_selected or value_selected))
         self.copy_button.set_sensitive(connected and key_selected)
         self.find_button.set_sensitive(connected)
 
@@ -1950,7 +1951,7 @@ class RegEditWindow(Gtk.Window):
             self.search_thread.self_destruct()
             self.search_thread = None
         if (self.pipe_manager is not None):
-            self.pipe_manager.close()
+            #self.pipe_manager.close()
             self.pipe_manager = None
 
         self.keys_store.clear()
@@ -2488,48 +2489,6 @@ class RegEditWindow(Gtk.Window):
     def on_tree_views_focus_in(self, widget, event):
         self.update_sensitivity()
 
-
-def PrintUsage():
-    print "Usage: %s [OPTIONS]" % (str(os.path.split(__file__)[-1]))
-    print ("All options are optional. "
-            "The user will be queried for additional information if needed.\n")
-    print "  -s  --server\t\tspecify the server to connect to."
-    print "  -u  --user\t\tspecify the user."
-    print "  -p  --password\tThe password for the user."
-    print "  -t  --transport\tTransport type."
-    print "\t\t\t\t0 for RPC, SMB, TCP/IP"
-    print "\t\t\t\t1 for RPC, TCP/IP"
-    print "\t\t\t\t2 for localhost."
-    print "  -c  --connect-now\tSkip the connect dialog."
-
-def ParseArgs(argv):
-    arguments = {}
-
-    try: #get arguments into a nicer format
-        opts, args = getopt.getopt(argv, "chu:s:p:t:",
-                                    ["help",        "user=", 
-                                    "server=",      "password=",
-                                    "connect-now",  "transport="])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ("-s", "--server"):
-            arguments.update({"server":arg})
-        elif opt in ("-u", "--user"):
-            arguments.update({"username":arg})
-        elif opt in ("-p", "--password"):
-            arguments.update({"password":arg})
-        elif opt in ("-t", "--transport"):
-            arguments.update({"transport_type":int(arg)})
-        elif opt in ("-c", "--connect-now"):
-            arguments.update({"connect_now":True})
-    return (arguments)
-
 """
     Info about the thread locks used in this utility:
 The pipe lock is <pipe manager instance>.lock.acquire() and .release()
@@ -2549,7 +2508,7 @@ If you have to, you may acquire both locks at the same time
 if __name__ == "__main__":
     GLib.set_prgname('gwregedit')
     # The [1:] ignores the first argument, which is the path to our utility
-    arguments = ParseArgs(sys.argv[1:])
+    arguments = connect.parse_args("gwregedit", sys.argv[1:])
 
     GLib.threads_init()
     Gdk.threads_init()

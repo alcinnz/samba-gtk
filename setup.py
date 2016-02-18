@@ -138,6 +138,7 @@ setup(
                         'res/registry-string.png',
                         'res/group.png',
                         'res/user.png']),
+                 # BEGIN ICONS
                  ('/usr/share/icons/hicolor/512x512/apps', [
                         'icons/512/samba.png']),
                  ('/usr/share/icons/hicolor/256x256/apps', [
@@ -176,6 +177,10 @@ setup(
                         'icons/48/samba-gwshare.png',
                         'icons/48/samba-gwsvcctl.png',
                         'icons/48/samba-gwwkssvc.png']),
+                 ('/usr/share/icons/hicolor/32x32/apps', ['icons/32/samba-gtkldb.png']),
+                 ('/usr/share/icons/hicolor/24x24/apps', ['icons/24/samba-gtkldb.png']),
+                 ('/usr/share/icons/hicolor/16x16/apps', ['icons/16/samba-gtkldb.png']),
+                 # END ICONS
                  ('/usr/share/man/man1', ['man/gtkldb.1', 'man/gwcrontab.1']),
                  ('/usr/share/mime/packages', ['mime/sambagtk.xml'])],
         cmdclass={'build': BuildData,

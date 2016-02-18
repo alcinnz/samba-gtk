@@ -47,6 +47,7 @@ from sambagtk.pysrvsvc import (
     srvsvcConnectDialog,
     ShareWizardDialog )
 from sambagtk.moderngtk import build_toolbar
+from sambagtk import connect
 
 class srvsvcPipeManager(object):
 
@@ -661,6 +662,7 @@ class ShareWindow(Gtk.Window):
                     self.username = username
                     password = dialog.get_password()
 
+                    print "Throws 'NT_STATUS_PORT_UNREACHABLE'"
                     pipe_manager = srvsvcPipeManager(server_address,
                             transport_type, username, password)
                     break
@@ -1596,52 +1598,9 @@ class ShareWindow(Gtk.Window):
 
 ###############################################################################
 
-
-def PrintUsage():
-    print 'Usage: %s [OPTIONS]'\
-         % str(os.path.split(__file__)[-1])
-    print 'All options are optional. '
-    print 'The user will be queried for additional information if needed.\n'
-    print '  -s  --server\t\tspecify the server to connect to.'
-    print '  -u  --user\t\tspecify the username.'
-    print '  -p  --password\tThe password for the user.'
-    print '  -t  --transport\tTransport type.'
-    print '\t\t\t\t0 for RPC, SMB, TCP/IP'
-    print '\t\t\t\t1 for RPC, TCP/IP'
-    print '\t\t\t\t2 for localhost.'
-    print '  -c  --connect-now\tSkip the connect dialog.'
-
-
-def ParseArgs(argv):
-    arguments = {}
-
-    try:  # get arguments into a nicer format
-        (opts, args) = getopt.getopt(argv, 'chu:s:p:t:', ['help',
-                        'user=', 'server=', 'password=', 'connect-now',
-                        'transport='])
-    except getopt.GetoptError:
-        PrintUsage()
-        sys.exit(2)
-
-    for (opt, arg) in opts:
-        if opt in ('-h', '--help'):
-            PrintUsage()
-            sys.exit(0)
-        elif opt in ('-s', '--server'):
-            arguments.update({'server': arg})
-        elif opt in ('-u', '--user'):
-            arguments.update({'username': arg})
-        elif opt in ('-p', '--password'):
-            arguments.update({'password': arg})
-        elif opt in ('-t', '--transport'):
-            arguments.update({'transport_type': int(arg)})
-        elif opt in ('-c', '--connect-now'):
-            arguments.update({'connect_now': True})
-    return arguments
-
-
 if __name__ == '__main__':
-    arguments = ParseArgs(sys.argv[1:])
+    GLib.set_prgname('gwshare')
+    arguments = connect.parse_args("gwshare", sys.argv[1:])
 
     GLib.threads_init()
     Gdk.threads_init()

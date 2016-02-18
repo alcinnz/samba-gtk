@@ -39,7 +39,7 @@ class wkssvcConnectDialog(ConnectDialog):
 class DomainJoinDialog(Gtk.Dialog):
     def __init__(self):
         """ Class initialiser """
-        super(JoinDomainDialog, self).__init__()
+        super(DomainJoinDialog, self).__init__()
         self.create()
 
     def toggle_pwd_visiblity(self, widget, Junk):
@@ -89,7 +89,6 @@ class DomainJoinDialog(Gtk.Dialog):
         grid.attach(label, 0, 0, 1, 1)
 
         self.server_address_entry = Gtk.Entry()
-        self.server_address_entry.set_text(self.sname)
         self.server_address_entry.set_activates_default(True)
         self.server_address_entry.set_tooltip_text(
             _("Enter destination server address"))
@@ -99,7 +98,6 @@ class DomainJoinDialog(Gtk.Dialog):
         grid.attach(label, 0, 1, 1, 1)
 
         self.domain_name_entry = Gtk.Entry()
-        self.domain_name_entry.set_text(self.sname)
         self.domain_name_entry.set_activates_default(True)
         self.domain_name_entry.set_tooltip_text(
             _("Enter name of the domain you wish to join"))
@@ -109,7 +107,6 @@ class DomainJoinDialog(Gtk.Dialog):
         grid.attach(label, 0, 2, 1, 1)
 
         self.machine_name_entry = Gtk.Entry()
-        self.machine_name_entry.set_text(self.comment)
         self.machine_name_entry.set_activates_default(True)
         self.machine_name_entry.set_tooltip_text(
                 _("Enter the NetBIOS/Hostname of the Machine "
@@ -125,13 +122,15 @@ class DomainJoinDialog(Gtk.Dialog):
         self.form_box.pack_start(frame, True, True, 0)
 
         grid = Gtk.Grid()
+        grid.set_border_width(5)
+        grid.set_row_spacing(2)
+        grid.set_column_spacing(6)
         frame.add(grid)
 
         label = Gtk.Label(_("Username:"), xalign=1, yalign=0.5)
         grid.attach(label, 0, 0, 1, 1)
 
         self.username_entry = Gtk.Entry()
-        self.username_entry.set_text(self.sname)
         self.username_entry.set_activates_default(True)
         self.username_entry.set_tooltip_text(_("Enter the Username"))
         grid.attach(self.username_entry, 1, 0, 1, 1)
@@ -140,7 +139,6 @@ class DomainJoinDialog(Gtk.Dialog):
         grid.attach(label, 0, 1, 1, 1)
 
         self.password_entry = Gtk.Entry()
-        self.password_entry.set_text(self.password)
         self.password_entry.set_activates_default(True)
         self.password_entry.set_visibility(False)
         self.password_entry.set_tooltip_text(_("Enter the Password"))
@@ -150,8 +148,6 @@ class DomainJoinDialog(Gtk.Dialog):
         self.set_pw_visiblity.set_property('active', False)
         self.set_pw_visiblity.set_tooltip_text(
                                 _("Toggle password visiblity"))
-        self.set_pw_visiblity.connect('toggled',
-                                self.toggle_pwd_visiblity, None)
         grid.attach(self.set_pw_visiblity, 1, 2, 1, 1)
 
         # action area
@@ -159,15 +155,14 @@ class DomainJoinDialog(Gtk.Dialog):
 
         self.cancel_button = Gtk.Button(_("Cancel"), Gtk.STOCK_CANCEL)
         self.cancel_button.set_property('can-default', True)
-        self.add_action_widget(self.cancel_button,
-                                Gtk.ResponseType.CANCEL)
+        self.add_action_widget(self.cancel_button, Gtk.ResponseType.CANCEL)
 
         self.ok_button = Gtk.Button(_("OK"), Gtk.STOCK_CONNECT)
         self.ok_button.set_property('can-default', True)
         self.add_action_widget(self.ok_button, Gtk.ResponseType.OK)
 
         self.set_default_response(Gtk.ResponseType.OK)
-        self.set_window_mode()
+        self.show_all()
 
 class DeleteDialog(Gtk.Dialog):
     """ The delete dialog """
